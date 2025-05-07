@@ -120,6 +120,7 @@ import org.spin.store.util.VueStoreFrontUtil;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.Value;
+/*
 import com.solop.sp010.controller.DisplayBuilder;
 import com.solop.sp010.data.calendar.CalendarData;
 import com.solop.sp010.data.expand_collapse.ExpandCollapseData;
@@ -137,9 +138,10 @@ import com.solop.sp010.query.ExpandCollapse;
 import com.solop.sp010.query.Kanban;
 import com.solop.sp010.query.Workflow;
 import com.solop.sp010.util.DisplayDefinitionChanges;
+*/
 
 public class DisplayDefinitionServiceLogic {
-
+	/*
 	public static PO validateAndGetDisplayDefinition(int displayDefinitionId) {
 			if (displayDefinitionId <= 0) {
 				throw new AdempiereException("@FillMandatory@ @SP010_DisplayDefinition_ID@");
@@ -361,6 +363,7 @@ public class DisplayDefinitionServiceLogic {
 				descriptionColumn.getColumnName()
 			);
 			*/
+			/*
 			// Assign Date From
 			MColumn assignDateFromColumn = resourceAssignmentTable.getColumn(I_S_ResourceAssignment.COLUMNNAME_AssignDateFrom);
 			FieldDefinition.Builder assignDateFromFieldBuilder = DisplayDefinitionConvertUtil.convertFieldDefinitionByColumn(assignDateFromColumn);
@@ -1440,6 +1443,7 @@ public class DisplayDefinitionServiceLogic {
 			}
 			resourceAssignment.setDescription(resourceDescription);
 			*/
+			/*
 			// Assign Date From
 			Timestamp resourceAssignDateFrom = ValueManager.getTimestampFromValue(
 				attributes.get(
@@ -1752,6 +1756,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param columnName
 	 * @return
 	 */
+	/*
 	private static int getReferenceId(int tableId, String columnName) {
 		MColumn column = MTable.get(Env.getCtx(), tableId).getColumn(columnName);
 		if(column == null) {
@@ -1766,6 +1771,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param attributes
 	 * @return void
 	 */
+	/*
 	private static void setAdditionalAttributes(PO entity, Map<String, Value> attributes) {
 		if(attributes != null) {
 			attributes.keySet().forEach(key -> {
@@ -1791,6 +1797,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param transactionName
 	 * @return void
 	 */
+	/*
 	private static void createBusinessPartnerAddress(MBPartner businessPartner, AddressRequest address, MLocation templateLocation, String transactionName) {
 		int countryId = address.getCountryId();
 		//	Instance it
@@ -1869,6 +1876,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param request
 	 * @return
 	 */
+	/*
 	public static BusinessPartner.Builder createBusinesPartner(CreateBusinessPartnerRequest request) {
 		PO displayDefinition = validateAndGetDisplayDefinition(
 			request.getDisplayDefinitionId()
@@ -1989,6 +1997,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param request
 	 * @return
 	 */
+	/*
 	public static BusinessPartner.Builder getBusinessPartner(GetBusinessPartnerRequest request) {
 		PO displayDefinition = validateAndGetDisplayDefinition(
 			request.getDisplayDefinitionId()
@@ -2035,6 +2044,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @return
 	 * @return MUser
 	 */
+	/*
 	private static MUser getOfBusinessPartnerLocation(MBPartnerLocation businessPartnerLocation, String transactionName) {
 		return new Query(
 				businessPartnerLocation.getCtx(),
@@ -2052,6 +2062,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param request
 	 * @return
 	 */
+	/*
 	public static BusinessPartner.Builder updateBusinessPartner(UpdateBusinessPartnerRequest request) {
 		PO displayDefinition = validateAndGetDisplayDefinition(
 			request.getDisplayDefinitionId()
@@ -2223,6 +2234,7 @@ public class DisplayDefinitionServiceLogic {
 	 * @param transactionName
 	 * @return void
 	 */
+	/*
 	private static void createCustomerAddress(MBPartner customer, AddressRequest address, MLocation templateLocation, String transactionName) {
 		int countryId = address.getCountryId();
 		//	Instance it
@@ -2295,5 +2307,6 @@ public class DisplayDefinitionServiceLogic {
 			contact.saveEx(transactionName);
  		}
 	}
+	*/
 
 }

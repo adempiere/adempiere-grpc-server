@@ -66,7 +66,7 @@ public class DisplayDefinition extends DisplayDefinitionImplBase {
 	private CLogger log = CLogger.getCLogger(DisplayDefinition.class);
 
 
-
+	/*
 	@Override
 	public void existsDisplayDefinitionsMetadata(ExistsDisplayDefinitionMetadataRequest request, StreamObserver<ExistsDisplayDefinitionMetadataResponse> responseObserver) {
 		try {
@@ -559,5 +559,6 @@ public class DisplayDefinition extends DisplayDefinitionImplBase {
 			);
 		}
 	}
+	*/
 
 }

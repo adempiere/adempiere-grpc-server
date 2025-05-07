@@ -1245,6 +1245,7 @@ public class POSLogic {
 			throw new AdempiereException("@FillMandatory@ @C_Payment_ID@");
 		}
 		AtomicReference<InfoOnlinePaymentResponse.Builder> builderReference = new AtomicReference<>();
+		/*
 		Trx.run(transactionName -> {
 			InfoOnlinePaymentResponse.Builder builder = InfoOnlinePaymentResponse.newBuilder();
 
@@ -1272,6 +1273,7 @@ public class POSLogic {
 			;
 			builderReference.set(builder);
 		});
+		*/
 		return builderReference.get();
 	}
 
@@ -1281,6 +1283,7 @@ public class POSLogic {
 			throw new AdempiereException("@FillMandatory@ @C_Payment_ID@");
 		}
 		AtomicReference<CancelOnlinePaymentResponse.Builder> builderReference = new AtomicReference<>();
+		/*
 		Trx.run(transactionName -> {
 			MPayment payment = new MPayment(Env.getCtx(), request.getId(), null);
 			CancelOnlinePaymentResponse.Builder builder = CancelOnlinePaymentResponse.newBuilder();
@@ -1304,7 +1307,7 @@ public class POSLogic {
 			;
 			builderReference.set(builder);
 		});
-
+		*/
 		return builderReference.get();
 	}
 

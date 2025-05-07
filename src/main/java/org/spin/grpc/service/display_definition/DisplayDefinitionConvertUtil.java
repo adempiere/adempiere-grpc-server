@@ -89,6 +89,7 @@ import org.spin.store.util.VueStoreFrontUtil;
 
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
+/*
 import com.solop.sp010.data.BaseFieldItem;
 import com.solop.sp010.data.calendar.CalendarItem;
 import com.solop.sp010.data.expand_collapse.ExpandCollapseItem;
@@ -104,10 +105,12 @@ import com.solop.sp010.data.timeline.TimeLineItem;
 import com.solop.sp010.data.workflow.WorkflowColumn;
 import com.solop.sp010.data.workflow.WorkflowItem;
 import com.solop.sp010.util.DisplayDefinitionChanges;
+*/
 
 public class DisplayDefinitionConvertUtil {
 
 
+	/*
 	public static DefinitionMetadata.Builder convertDefinitionMetadata(PO record, boolean isWithFields) {
 		DefinitionMetadata.Builder builder = DefinitionMetadata.newBuilder();
 		if (record == null || record.get_ID() <= 0) {
@@ -577,6 +580,7 @@ public class DisplayDefinitionConvertUtil {
 	 * @param info
 	 * @return
 	 */
+	/*
 	public static Reference.Builder convertReference(Properties context, MLookupInfo info) {
 		Reference.Builder builder = Reference.newBuilder();
 		if (info == null) {
@@ -613,6 +617,7 @@ public class DisplayDefinitionConvertUtil {
 	 * @param fieldGroupId
 	 * @return
 	 */
+	/*
 	public static FieldGroup.Builder convertFieldGroup(int fieldGroupId) {
 		FieldGroup.Builder builder = FieldGroup.newBuilder();
 		if(fieldGroupId <= 0) {
@@ -1901,6 +1906,7 @@ public class DisplayDefinitionConvertUtil {
 	 * @param businessPartner
 	 * @return
 	 */
+	/*
 	public static BusinessPartner.Builder convertBusinessPartner(MBPartner businessPartner, GenericItem baseItem) {
 		if(businessPartner == null || businessPartner.getC_BPartner_ID() <= 0) {
 			return BusinessPartner.newBuilder();
@@ -2031,6 +2037,7 @@ public class DisplayDefinitionConvertUtil {
 	 * @return
 	 * @return Address.Builder
 	 */
+	/*
 	public static Address.Builder convertBusinessPartnerAddress(MBPartnerLocation businessPartnerLocation) {
 		if(businessPartnerLocation == null) {
 			return Address.newBuilder();
@@ -2213,5 +2220,6 @@ public class DisplayDefinitionConvertUtil {
 		//	
 		return builder;
 	}
+	*/
 
 }
