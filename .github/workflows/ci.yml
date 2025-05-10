@@ -48,13 +48,13 @@ jobs:
           architecture: x64
 
       - name: Build with Gradle
-        run: gradle build
-        env:
-          ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
-          ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.0.2
           arguments: build
+        env:
+          ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
+          ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
 
       - name: Upload descriptor file artifact
         uses: actions/upload-artifact@v4
