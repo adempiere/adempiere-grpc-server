@@ -52,6 +52,9 @@ service FieldManagementService {
 			additional_bindings: {
 				get: "/fields/default-value/query-criteria/{browse_field_to_id}/to"
 			}
+			additional_bindings: {
+				get: "/fields/default-value/display-definition/{display_definition_field_id}"
+			}
 		};
 	}
 	// List Lookup Item
@@ -70,6 +73,9 @@ service FieldManagementService {
 			additional_bindings: {
 				get: "/fields/lookups/query-criteria/{browse_field_id}"
 			}
+			additional_bindings: {
+				get: "/fields/lookups/display-definition/{display_definition_field_id}"
+			}
 		};
 	}
 	// List General Search Records
@@ -87,6 +93,9 @@ service FieldManagementService {
 			}
 			additional_bindings: {
 				get: "/fields/searchs/query-criteria/{browse_field_id}"
+			}
+			additional_bindings: {
+				get: "/fields/searchs/display-definition/{display_definition_field_id}"
 			}
 		};
 	}
@@ -116,19 +125,21 @@ service FieldManagementService {
 	}
 }
 
+
 // Default Value
 message GetDefaultValueRequest {
+	google.protobuf.Value value = 1;
+	string context_attributes = 2;
 	// References
-	string table_name = 1;
-	string column_name = 2;
-	int32 column_id = 3;
-	int32 field_id = 4;
-	int32 process_parameter_id = 5;
-	int32 process_parameter_to_id = 6;
-	int32 browse_field_id = 7;
-	int32 browse_field_to_id = 8;
-	string context_attributes = 9;
-	google.protobuf.Value value = 10;
+	string table_name = 3;
+	string column_name = 4;
+	int32 column_id = 5;
+	int32 field_id = 6;
+	int32 process_parameter_id = 7;
+	int32 process_parameter_to_id = 8;
+	int32 browse_field_id = 9;
+	int32 browse_field_to_id = 10;
+	int32 display_definition_field_id = 11;
 }
 message DefaultValue {
 	int32 id = 1;
@@ -148,16 +159,17 @@ message ListGeneralSearchRecordsRequest {
 	string search_value = 7;
 	string context_attributes = 8;
 	bool is_only_active_records = 9;
+	bool is_without_validation = 10;
+	google.protobuf.Value current_value = 11;
 	// references
-	int32 process_parameter_id = 10;
-	int32 field_id = 11;
-	int32 browse_field_id = 12;
-	int32 reference_id = 13;
-	int32 column_id = 14;
-	string table_name = 15;
-	string column_name = 16;
-	//
-	bool is_without_validation = 17;
+	int32 reference_id = 12;
+	string table_name = 13;
+	string column_name = 14;
+	int32 column_id = 15;
+	int32 field_id = 16;
+	int32 process_parameter_id = 17;
+	int32 browse_field_id = 18;
+	int32 display_definition_field_id = 19;
 }
 
 
@@ -181,11 +193,12 @@ message ZoomWindow {
 	string name = 3;
 	string description = 4;
 	bool is_sales_transaction = 5;
+	bool is_purchase = 6;
 	// tab
-	int32 tab_id = 6;
-	string tab_uuid = 7;
-	string tab_name = 8;
-	bool is_parent_tab = 9;
+	int32 tab_id = 7;
+	string tab_uuid = 8;
+	string tab_name = 9;
+	bool is_parent_tab = 10;
 }
 message ListZoomWindowsResponse {
 	string table_name = 1;

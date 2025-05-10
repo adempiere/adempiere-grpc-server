@@ -19,7 +19,7 @@ import org.compiere.util.Env;
 import org.compiere.util.Util;
 import org.spin.backend.grpc.common.ListLookupItemsResponse;
 import org.spin.backend.grpc.field.order.GetOrderInfoRequest;
-import org.spin.backend.grpc.field.order.ListBusinessPartnersOrderRequest;
+import org.spin.backend.grpc.field.order.ListBusinessPartnersRequest;
 import org.spin.backend.grpc.field.order.ListOrdersInfoRequest;
 import org.spin.backend.grpc.field.order.ListOrdersInfoResponse;
 import org.spin.backend.grpc.field.order.OrderInfo;
@@ -34,6 +34,7 @@ import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.value.BooleanManager;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 public class OrderInfoLogic {
@@ -45,7 +46,7 @@ public class OrderInfoLogic {
 	 * @return
 	 */
 
-	 public static ListLookupItemsResponse.Builder listBusinessPartners(ListBusinessPartnersOrderRequest request) {
+	 public static ListLookupItemsResponse.Builder listBusinessPartners(ListBusinessPartnersRequest request) {
 		String whereClause = "";
 		if (!Util.isEmpty(request.getIsSalesTransaction(), true)) {
 			boolean isSalesTransaction = BooleanManager.getBooleanFromString(
@@ -95,7 +96,7 @@ public class OrderInfoLogic {
 			+ "o.IsSOTrx, "
 			+ "o.Description, "
 			+ "o.POReference, "
-			+ "o.isdelivered, "
+			+ "o.isDelivered, "
 			+ "o.DocStatus "
 			+ "FROM C_Order AS o "
 			+ "WHERE o.C_Order_ID = ? "
@@ -148,16 +149,18 @@ public class OrderInfoLogic {
 		//
 		String sql = "SELECT "
 			+ "o.C_Order_ID, o.UUID,"
-			+ "(SELECT Name FROM C_BPartner bp WHERE bp.C_BPartner_ID=o.C_BPartner_ID) AS BusinessPartner, "
+			+ "o.C_BPartner_ID,"
+			+ "(SELECT Name FROM C_BPartner AS bp WHERE bp.C_BPartner_ID=o.C_BPartner_ID) AS BusinessPartner, "
 			+ "o.DateOrdered, "
 			+ "o.DocumentNo, "
-			+ "((SELECT ISO_Code FROM C_Currency c WHERE c.C_Currency_ID=o.C_Currency_ID)) AS Currency, "
+			+ "o.C_Currency_ID, "
+			+ "((SELECT ISO_Code FROM C_Currency AS c WHERE c.C_Currency_ID=o.C_Currency_ID)) AS Currency, "
 			+ "o.GrandTotal, "
 			+ "currencyBase(o.GrandTotal,o.C_Currency_ID,o.DateAcct, o.AD_Client_ID,o.AD_Org_ID), "
 			+ "o.IsSOTrx, "
 			+ "o.Description, "
 			+ "o.POReference, "
-			+ "o.isdelivered, "
+			+ "o.isDelivered, "
 			+ "o.DocStatus "
 			+ "FROM C_Order AS o "
 			+ "WHERE 1=1 "
@@ -228,11 +231,11 @@ public class OrderInfoLogic {
 				filtersList.add(dateTo);
 			}
 		}
-		// Order
-		if (request.getOrderId() > 0) {
-			sql += "AND o.C_Order_ID = ? ";
+		// Order Reference
+		if (!Util.isEmpty(request.getOrderReference(), true)) {
+			sql += "AND UPPER(o.POReference) LIKE '%' || UPPER(?) || '%' ";
 			filtersList.add(
-				request.getOrderId()
+				request.getOrderReference()
 			);
 		}
 		// Grand Total From
@@ -263,7 +266,8 @@ public class OrderInfoLogic {
 				"o",
 				MRole.SQL_FULLYQUALIFIED,
 				MRole.SQL_RO
-			);
+			)
+		;
 
 		StringBuffer whereClause = new StringBuffer();
 
@@ -290,7 +294,8 @@ public class OrderInfoLogic {
 			whereClause.append(" AND ")
 				.append("(")
 				.append(dynamicWhere)
-				.append(")");
+				.append(")")
+			;
 		}
 
 		sqlWithRoleAccess += whereClause;
@@ -303,7 +308,7 @@ public class OrderInfoLogic {
 		final int count = CountUtil.countRecords(parsedSQL, tableName, "o", filtersList);
 
 		//	Add Row Number
-		parsedSQL += " ORDER BY o.DateOrdered desc, o.DocumentNo ";
+		parsedSQL += " ORDER BY o.DateOrdered DESC, o.DocumentNo ";
 		parsedSQL = LimitUtil.getQueryWithLimit(parsedSQL, limit, offset);
 
 		//	Set page token
@@ -315,7 +320,7 @@ public class OrderInfoLogic {
 		ListOrdersInfoResponse.Builder builderList = ListOrdersInfoResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					nexPageToken
 				)
 			)

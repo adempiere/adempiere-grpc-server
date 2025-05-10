@@ -22,11 +22,7 @@ import java.util.Optional;
 import org.adempiere.core.domains.models.I_C_ConversionType;
 import org.adempiere.core.domains.models.I_C_PaymentMethod;
 import org.adempiere.exceptions.AdempiereException;
-import org.compiere.model.MBank;
-import org.compiere.model.MInvoice;
-import org.compiere.model.MOrder;
-import org.compiere.model.MPOS;
-import org.compiere.model.MPayment;
+import org.compiere.model.*;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Msg;
@@ -36,6 +32,7 @@ import org.spin.base.util.ConvertUtil;
 import org.spin.base.util.RecordUtil;
 import org.spin.pos.service.order.OrderManagement;
 import org.spin.pos.service.order.OrderUtil;
+import org.spin.pos.service.pos.POS;
 import org.spin.pos.util.ColumnsAdded;
 import org.spin.service.grpc.util.value.NumberManager;
 import org.spin.service.grpc.util.value.ValueManager;
@@ -90,6 +87,40 @@ public class CollectingManagement {
 		} else {
 			documentTypeId = pointOfSalesDefinition.get_ValueAsInt("POSRefundDocumentType_ID");
 		}
+
+		//	TODO: Validate with `allocatePaymenMethodtId` value
+		//	Payment Method
+		final int paymentMethodId = request.getPaymentMethodId();
+		if (paymentMethodId > 0) {
+			PO paymentTypeAllocation = POS.getPaymentMethodAllocation(paymentMethodId, pointOfSalesDefinition.getC_POS_ID(), null);
+			if(paymentTypeAllocation != null && paymentTypeAllocation.get_ID() > 0) {
+				if(paymentTypeAllocation.get_ValueAsInt("C_DocTypeTarget_ID") > 0 && !request.getIsRefund()) {
+					documentTypeId = pointOfSalesDefinition.get_ValueAsInt("C_DocTypeTarget_ID");
+				}
+			}
+			payment.set_ValueOfColumn(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID, paymentMethodId);
+		}
+
+		//	Allocate Payment Method
+		final int allocatePaymenMethodtId = request.getAllocatePaymentId();
+		if (allocatePaymenMethodtId > 0) {
+			PO paymentMethodAllocation = POS.getPaymentTypeAllocationId(allocatePaymenMethodtId, null);
+			if(paymentMethodAllocation != null && paymentMethodAllocation.get_ID() > 0) {
+				payment.setIsOnline(
+					paymentMethodAllocation.get_ValueAsBoolean("IsOnline")
+				);
+
+				// TODO: Validate with `paymentMethodId` value
+				// if(paymentMethodAllocation.get_ValueAsInt("C_DocTypeTarget_ID") > 0 && !request.getIsRefund()) {
+				// 	documentTypeId = pointOfSalesDefinition.get_ValueAsInt("C_DocTypeTarget_ID");
+				// }
+				// payment.set_ValueOfColumn(
+				// 	I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID,
+				// 	paymentMethodAllocation.get_ValueAsInt(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID)
+				// );
+			}
+		}
+
 		if(documentTypeId > 0) {
 			payment.setC_DocType_ID(documentTypeId);
 		} else {
@@ -99,10 +130,10 @@ public class CollectingManagement {
 		Timestamp date = ValueManager.getDateFromTimestampDate(
 			request.getPaymentDate()
 		);
-    	if(date != null) {
-    		payment.setDateTrx(date);
-    		payment.setDateAcct(date);
-    	}
+		if(date != null) {
+			payment.setDateTrx(date);
+			payment.setDateAcct(date);
+		}
 		Timestamp dateValue = ValueManager.getDateFromTimestampDate(
 			request.getPaymentAccountDate()
 		);
@@ -110,7 +141,7 @@ public class CollectingManagement {
     		payment.setDateAcct(dateValue);
     	}
         payment.setTenderType(tenderType);
-        payment.setDescription(Optional.ofNullable(request.getDescription()).orElse(salesOrder.getDescription()));
+        payment.setDescription(Optional.of(request.getDescription()).orElse(salesOrder.getDescription()));
         payment.setC_BPartner_ID (salesOrder.getC_BPartner_ID());
         payment.setC_Currency_ID(currencyId);
         payment.setC_POS_ID(pointOfSalesDefinition.getC_POS_ID());
@@ -158,10 +189,7 @@ public class CollectingManagement {
 				payment.setDescription(request.getDescription());
 				break;
 		}
-		//	Payment Method
-		if(request.getPaymentMethodId() > 0) {
-			payment.set_ValueOfColumn(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID, request.getPaymentMethodId());
-		}
+
 		//	Set Bank Id
 		if(request.getBankId() > 0) {
 			payment.set_ValueOfColumn(MBank.COLUMNNAME_C_Bank_ID, request.getBankId());
@@ -171,20 +199,29 @@ public class CollectingManagement {
 			payment.setC_BP_BankAccount_ID(request.getCustomerBankAccountId());
 		}
 		//	Validate reference
-		if(!Util.isEmpty(request.getReferenceNo())) {
+		if(!Util.isEmpty(request.getReferenceNo(), true)) {
 			payment.setDocumentNo(request.getReferenceNo());
 			payment.addDescription(request.getReferenceNo());
 		}
 		CashUtil.setCurrentDate(payment);
-		if(Util.isEmpty(payment.getDocumentNo())) {
-			String value = DB.getDocumentNo(payment.getC_DocType_ID(), transactionName, false,  payment);
-	        payment.setDocumentNo(value);
+		if(Util.isEmpty(payment.getDocumentNo(), true)) {
+			String value = DB.getDocumentNo(payment.getC_DocType_ID(), transactionName, false, payment);
+			payment.setDocumentNo(value);
 		}
 		//	
 		if(request.getInvoiceReferenceId() > 0) {
 			payment.set_ValueOfColumn(ColumnsAdded.COLUMNNAME_ECA14_Invoice_Reference_ID, request.getInvoiceReferenceId());
 		}
 		payment.saveEx(transactionName);
+		// if(payment.setPaymentProcessor()) {
+		// 	payment.setIsApproved(false);
+		// 	boolean isOk = payment.processOnline();
+		// 	if(!isOk) {
+		// 		throw new AdempiereException(payment.getErrorMessage());
+		// 	}
+		// 	payment.setIsApproved(true);
+		// 	payment.saveEx();
+		// }
 		return payment;
 	}
 }

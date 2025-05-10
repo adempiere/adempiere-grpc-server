@@ -20,7 +20,10 @@ option java_package = "org.spin.backend.grpc.field.business_partner";
 option java_outer_classname = "ADempiereBusinessPartner";
 
 import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+
+import "base_data_type.proto";
 
 // Base URL
 // /fields/business-partners/
@@ -29,6 +32,13 @@ package field.business_partner;
 
 // The business partner service definition.
 service BusinessPartnerInfoService {
+	// Filters
+	rpc ListBusinessPartnerGroups(ListBusinessPartnerGroupsRequest) returns (data.ListLookupItemsResponse) {
+		option (google.api.http) = {
+			get: "/fields/business-partners/groups"
+		};
+	}
+
 	// Result
 	rpc ListBusinessPartnersInfo(ListBusinessPartnersInfoRequest) returns (ListBusinessPartnersInfoResponse) {
 		option (google.api.http) = {
@@ -48,6 +58,9 @@ service BusinessPartnerInfoService {
 			additional_bindings: {
 				get: "/fields/business-partners/query-criteria/{browse_field_id}"
 			}
+			additional_bindings: {
+				get: "/fields/business-partners/display-definition/{display_definition_field_id}"
+			}
 		};
 	}
 	rpc ListBusinessPartnerContacts(ListBusinessPartnerContactsRequest) returns (ListBusinessPartnerContactsResponse) {
@@ -60,6 +73,22 @@ service BusinessPartnerInfoService {
 			get: "/fields/business-partners/{business_partner_id}/address-locations"
 		};
 	}
+}
+
+
+// Business Partner Group
+message ListBusinessPartnerGroupsRequest {
+	string filters = 1;
+	string sort_by = 2;
+	repeated string group_columns = 3;
+	repeated string select_columns = 4;
+	int32 page_size = 5;
+	string page_token = 6;
+	string search_value = 7;
+	string context_attributes = 8;
+	bool is_only_active_records = 9;
+	bool is_without_validation = 10;
+	google.protobuf.Value current_value = 11;
 }
 
 
@@ -79,6 +108,8 @@ message BusinessPartnerInfo {
 	string credit_used_amount = 12;
 	string revenue_amount = 13;
 	bool is_active = 14;
+	bool is_customer = 15;
+	bool is_vendor = 16;
 }
 
 message ListBusinessPartnersInfoResponse {
@@ -97,26 +128,27 @@ message ListBusinessPartnersInfoRequest {
 	string search_value = 7;
 	string context_attributes = 8;
 	bool is_only_active_records = 9;
+	bool is_without_validation = 10;
+	google.protobuf.Value current_value = 11;
 	// references
-	int32 process_parameter_id = 10;
-	int32 field_id = 11;
-	int32 browse_field_id = 12;
-	int32 reference_id = 13;
-	int32 column_id = 14;
-	string table_name = 15;
-	string column_name = 16;
-	//
-	bool is_without_validation = 17;
+	int32 reference_id = 12;
+	string table_name = 13;
+	string column_name = 14;
+	int32 column_id = 15;
+	int32 field_id = 16;
+	int32 process_parameter_id = 17;
+	int32 browse_field_id = 18;
+	int32 display_definition_field_id = 19;
 	// custom filters
-	string value = 18;
-	string contact = 19;
-	string phone = 20;
-	string customer = 21;
-	string name = 22;
-	string email = 23;
-	string postal_code = 24;
-	string is_vendor = 25;
-	string is_customer = 26;
+	string value = 20; // As code
+	string contact = 21;
+	string phone = 22;
+	string name = 23;
+	string email = 24;
+	string postal_code = 25;
+	string is_vendor = 26;
+	string is_customer = 27;
+	int32 business_partner_group_id = 28;
 }
 
 
@@ -163,15 +195,20 @@ message ListBusinessPartnerContactsRequest {
 message BusinessPartnerAddressLocation {
 	int32 id = 1;
 	string uuid = 2;
-	string phone = 3;
-	string phone2 = 4;
-	string fax = 5;
-	string address = 6;
-	bool is_ship_to_address = 7; // Ship Adrress
-	bool is_bill_to_address = 8; // Invoice Address
-	bool is_remit_to_address = 9; // Pay-From Address
-	bool is_pay_form_address = 10; // Remit-To Address
-	bool is_active = 11;
+	string name = 3;
+	string description = 4;
+	string phone = 5;
+	string phone2 = 6;
+	string fax = 7;
+	string address = 8;
+	string map_url = 9;
+	bool is_ship_to_address = 10; // Ship Adrress
+	bool is_bill_to_address = 11; // Invoice Address
+	bool is_remit_to_address = 12; // Pay-From Address
+	bool is_pay_form_address = 13; // Remit-To Address
+	bool is_active = 14;
+	bool is_default_shipping = 15;
+	bool is_default_billing = 16;
 }
 
 message ListBusinessPartnerAddressLocationsResponse {

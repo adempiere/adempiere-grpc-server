@@ -5,15 +5,26 @@ plugins {
     id 'application'
     id 'visual-studio'
     id 'maven-publish'
+	id "io.github.uoxx3.project-environment" version "1.0.1"
 }
 
 group 'com.nikhilm'
 
-sourceCompatibility = 1.11
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_17
+}
 
 def grpcVersion = '1.63.0'
 def protobufVersion = '3.25.3'
+<<<<<<< HEAD
 def descriptorFile = "adempiere-grpc-server.pb"
+=======
+def baseVersion = '3.9.4.001'
+def baseGroupId = 'io.github.adempiere'
+
+def descriptorFile = "adempiere-grpc-server.dsc"
+>>>>>>> update
 def javaMainClass = "org.spin.server.AllInOneServices"
 def baseGroupId = 'io.github.adempiere'
 
@@ -60,10 +71,36 @@ dependencies {
     // https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java
 	implementation "com.google.protobuf:protobuf-java:${protobufVersion}"
 	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
-    implementation 'javax.xml.bind:jaxb-api:2.4.0-b180830.0359'
-	implementation 'com.sun.xml.bind:jaxb-impl:3.0.0-M4'
-	implementation 'com.sun.xml.bind:jaxb-core:3.0.0-M4'
-	implementation 'javax.activation:activation:1.1.1'
+    implementation 'javax.activation:activation:1.1.1'
+
+	//	ADempiere Core
+	implementation "${baseGroupId}:base:${baseVersion}"
+	implementation "${baseGroupId}:point-of-sales:${baseVersion}"
+	implementation "${baseGroupId}:store:${baseVersion}"
+	implementation "${baseGroupId}:distribution:${baseVersion}"
+	implementation "${baseGroupId}:freight:${baseVersion}"
+	implementation "${baseGroupId}:store:${baseVersion}"
+	implementation "${baseGroupId}:human-resource-and-payroll:${baseVersion}"
+	implementation "${baseGroupId}:extend:${baseVersion}"
+	implementation "${baseGroupId}:migration:${baseVersion}"
+	implementation "${baseGroupId}:asset:${baseVersion}"
+	implementation "${baseGroupId}:crm:${baseVersion}"
+	implementation "${baseGroupId}:production:${baseVersion}"
+	implementation "${baseGroupId}:project:${baseVersion}"
+	implementation "${baseGroupId}:request:${baseVersion}"
+	implementation "${baseGroupId}:adempiere.test:${baseVersion}"
+	implementation "${baseGroupId}:cashflow:${baseVersion}"
+	implementation "${baseGroupId}:manufacturing:${baseVersion}"
+	implementation "${baseGroupId}:wms:${baseVersion}"
+	implementation "${baseGroupId}:openid-authentication:${baseVersion}"
+	implementation "${baseGroupId}:investment-and-loan:${baseVersion}"
+	implementation "${baseGroupId}:time-and-attendance:${baseVersion}"
+	implementation "${baseGroupId}:loan:${baseVersion}"
+	implementation "${baseGroupId}:discord-notifier:${baseVersion}"
+	implementation "${baseGroupId}:telegram-notifier:${baseVersion}"
+	implementation "${baseGroupId}:tools:${baseVersion}"
+	implementation "${baseGroupId}:jasperreports:${baseVersion}"
+
 	//	Others
 	compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
     implementation 'com.shw:adempiere-shw.shw_libs:3.9.4.001-1.1.24'
@@ -73,6 +110,7 @@ configurations.all {
 	resolutionStrategy {
 		// used by aws-java-sdk-core (storefront is joda-time-2.10.4)
 		force("joda-time:joda-time:2.8.1")
+		// force("io.github.adempiere:adempiere-grpc-utils:local-1.0.0")
 	}
 }
 
@@ -97,7 +135,7 @@ protobuf {
 
 			// Allows to override the default for the descriptor set location
 			task.descriptorSetOptions.path = "${projectDir}/build/descriptors/${descriptorFile}"
-			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-grpc-server.pb"
+			// task.descriptorSetOptions.path = "${projectDir}/build/descriptors/adempiere-grpc-server.dsc"
 
 			// If true, the descriptor set will contain line number information
 			// and comments. Default is false.

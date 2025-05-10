@@ -32,6 +32,8 @@ import org.adempiere.core.domains.models.I_AD_Field;
 import org.adempiere.core.domains.models.I_C_Invoice;
 import org.adempiere.core.domains.models.I_C_ValidCombination;
 import org.adempiere.core.domains.models.I_Fact_Acct;
+import org.adempiere.core.domains.models.I_M_MatchInv;
+import org.adempiere.core.domains.models.I_M_MatchPO;
 import org.adempiere.core.domains.models.X_C_AcctSchema_Element;
 import org.adempiere.core.domains.models.X_Fact_Acct;
 import org.compiere.model.GridField;
@@ -69,6 +71,7 @@ import org.spin.service.grpc.util.db.CountUtil;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.query.Filter;
 import org.spin.service.grpc.util.query.FilterManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 import org.spin.backend.grpc.common.Entity;
 import org.spin.backend.grpc.common.ListEntitiesResponse;
@@ -197,7 +200,7 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 					accoutingElement.isBalanced()
 				)
 				.setElementType(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						accoutingElement.getElementType()
 					)
 				)
@@ -373,7 +376,7 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 					null
 				)
 				.setParameters(request.getValue())
-				.firstOnly();
+				.first();
 		}
 		if(accountingCombination == null) {
 			throw new AdempiereException("@Error@ @AccountCombination@ @not.found@");
@@ -476,7 +479,9 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		//	Set next page
-		builder.setNextPageToken(ValueManager.validateNull(nexPageToken));
+		builder.setNextPageToken(
+			StringManager.getValidString(nexPageToken)
+		);
 
 		return builder;
 	}
@@ -524,13 +529,16 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 		}
 		MAcctSchema accountingSchema = MAcctSchema.get(Env.getCtx(), accountingSchemaId, null);
 
-		final String accountingCombinationAlias = ValueManager.validateNull(
+		final String accountingCombinationAlias = StringManager.getValidString(
 			request.getAlias()
 		);
 
 		List<MAcctSchemaElement> acctingSchemaElements = Arrays.asList(accountingSchema.getAcctSchemaElements());
 
 		Map<String, Object> attributesList = ValueManager.convertValuesMapToObjects(request.getAttributes().getFieldsMap());
+		attributesList.put(I_C_ValidCombination.COLUMNNAME_AD_Org_ID, organizationId);
+		attributesList.put(I_C_ValidCombination.COLUMNNAME_Account_ID, accountId);
+
 		StringBuffer sql = generateSQL(acctingSchemaElements, attributesList);
 
 		int clientId = Env.getContextAsInt(Env.getCtx(), windowNo, MAccount.COLUMNNAME_AD_Client_ID);
@@ -546,7 +554,7 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			rs = pstmt.executeQuery();
 			if (rs.next()) {
 				accountingCombinationId = rs.getInt(1);
-				accountingAlias = ValueManager.validateNull(
+				accountingAlias = StringManager.getValidString(
 					rs.getString(2)
 				);
 			}
@@ -763,7 +771,13 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			null
 		);
 		if (!Util.isEmpty(errorMessage, true)) {
-			rePostBuilder.setErrorMsg(errorMessage);
+			errorMessage = Msg.getMsg(
+				Env.getCtx(),
+				errorMessage
+			);
+			rePostBuilder.setErrorMsg(
+				StringManager.getValidString(errorMessage)
+			);
 		}
 
 		return rePostBuilder;
@@ -881,9 +895,20 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			return builder;
 		}
 		final MTable documentTable = MTable.get(Env.getCtx(), request.getTableName());
-		if (documentTable == null || documentTable.getAD_Table_ID() == 0 || !documentTable.isDocument()) {
+		if (documentTable == null || documentTable.getAD_Table_ID() == 0) {
 			// throw new AdempiereException("@AD_Table_ID@ @Invalid@");
 			return builder;
+		}
+
+		if (!documentTable.isDocument() || documentTable.isView()) {
+			// TODO: Remove this condition when complete support to document table
+			final List<String> POSTED_TABLES_WITHOUT_DOCUMENT = Arrays.asList(
+				I_M_MatchInv.Table_Name,
+				I_M_MatchPO.Table_Name
+			);
+			if (!POSTED_TABLES_WITHOUT_DOCUMENT.contains(documentTable.getTableName())) {
+				return builder;
+			}
 		}
 
 		// Validate record
@@ -1079,18 +1104,6 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			filtersList.add(recordId);
 		}
 
-		// Organization
-		int organizationId = request.getOrganizationId();
-		if (organizationId > 0) {
-			whereClause.append(" AND ")
-				.append(I_Fact_Acct.Table_Name)
-				.append(".")
-				.append(I_Fact_Acct.COLUMNNAME_AD_Org_ID)
-				.append(" = ? ")
-			;
-			filtersList.add(organizationId);
-		}
-
 		// add where with access restriction
 		String sqlWithRescriction = sql.toString() + whereClause.toString();
 		String parsedSQL = MRole.getDefault(Env.getCtx(), false)
@@ -1111,6 +1124,7 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 		int count = CountUtil.countRecords(parsedSQL, I_Fact_Acct.Table_Name, filtersList);
 		//  Add Row Number
 		parsedSQL = LimitUtil.getQueryWithLimit(parsedSQL, limit, offset);
+		parsedSQL += ("ORDER BY " + I_Fact_Acct.Table_Name + ".Fact_Acct_ID");
 		builder = RecordUtil.convertListEntitiesResult(table, parsedSQL, filtersList);
 		//
 		builder.setRecordCount(count);
@@ -1120,7 +1134,9 @@ public class GeneralLedger extends GeneralLedgerImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		//  Set next page
-		builder.setNextPageToken(ValueManager.validateNull(nexPageToken));
+		builder.setNextPageToken(
+			StringManager.getValidString(nexPageToken)
+		);
 
 		return builder;
 	}

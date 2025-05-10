@@ -86,6 +86,7 @@ import org.spin.service.grpc.util.db.CountUtil;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.value.BooleanManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 public class ProductInfoLogic {
@@ -605,6 +606,18 @@ public class ProductInfoLogic {
 				;
 			}
 			sqlWhere += " AND p.IsSummary='N' ";
+
+			// Is Only Stock Available
+			if (request.getIsOnlyStockAvailable()) {
+				// compare with `QtyOnHand` column
+				sqlWhere += " AND ("
+					+ "CASE WHEN p.IsBOM='N' AND (p.ProductType!='I' OR p.IsStocked='N') "
+						+ "THEN to_number(get_Sysconfig('QTY_TO_SHOW_FOR_SERVICES', '99999', p.AD_Client_ID, 0), '99999999999') "
+						+ "ELSE bomQtyOnHand(p.M_Product_ID, " + warhouseId + ", 0) "
+					+ "END > 0"
+					+ ") "
+				;
+			}
 		}
 
 		String sql = sqlQuery + sqlFrom + sqlWhere;
@@ -648,7 +661,7 @@ public class ProductInfoLogic {
 		ListProductsInfoResponse.Builder builderList = ListProductsInfoResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					nexPageToken
 				)
 			)

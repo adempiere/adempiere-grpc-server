@@ -23,6 +23,7 @@ on:
       - experimental
       - test/**
       - bugfix/**
+      - hotfix/**
       - feature/**
     paths-ignore:
       - README.md
@@ -38,16 +39,16 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 11
+      - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-package: 'jdk'
-          java-version: 11
+          java-version: 17
           architecture: x64
 
       - name: Build with Gradle
-        uses: gradle/actions/setup-gradle@v3
+        run: gradle build
         env:
           ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
           ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
@@ -55,9 +56,9 @@ jobs:
           gradle-version: 8.0.2
           arguments: build
 
-    #   - name: Upload descriptor file artifact
-    #     uses: actions/upload-artifact@v4
-    #     with:
-    #       name: adempiere-grpc-server.pb
-    #       path: build/descriptors/adempiere-grpc-server.pb
-    #       retention-days: 7
+      - name: Upload descriptor file artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: adempiere-grpc-server.dsc
+          path: build/descriptors/adempiere-grpc-server.dsc
+          retention-days: 1

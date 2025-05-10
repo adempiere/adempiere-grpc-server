@@ -48,7 +48,7 @@ import org.spin.eca62.support.ResourceMetadata;
 import org.spin.model.MADAppRegistration;
 import org.spin.queue.notification.DefaultNotifier;
 import org.spin.queue.util.QueueLoader;
-import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.util.support.AppSupportHandler;
 import org.spin.util.support.IAppSupport;
 
@@ -177,17 +177,17 @@ public class SendNotifications extends SendNotificationsImplBase{
 			String description = refList.get_Translation(I_AD_Ref_List.COLUMNNAME_Value);
 			NotifcationType.Builder builder = NotifcationType.newBuilder()
 				.setName(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						name
 					)
 				)
 				.setValue(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						value
 					)
 				)
 				.setDescription(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						description
 					)
 				)
@@ -278,9 +278,23 @@ public class SendNotifications extends SendNotificationsImplBase{
 
 		// Add Recipient to Notification
 		request.getRecipientsList().forEach(recipients -> {
+			int contactId = -1;
+			String accountName = null;
+			if (recipients.getContactId() > 0) {
+				MUser user = MUser.get(Env.getCtx(), recipients.getContactId());
+				if (user != null) {
+					contactId = user.getAD_User_ID();
+					if (!Util.isEmpty(user.getEMail(), true)) {
+						accountName = user.getEMail();
+					}
+				}
+			}
+			if (Util.isEmpty(accountName, true)) {
+				accountName = recipients.getAccountName();
+			}
 			notifier.addRecipient(
-				recipients.getContactId(),
-				recipients.getAccountName()
+				contactId,
+				accountName
 			);
 		});
 

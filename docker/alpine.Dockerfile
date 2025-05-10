@@ -1,4 +1,4 @@
-FROM eclipse-temurin:11.0.23_9-jdk-alpine
+FROM eclipse-temurin:17.0.12_7-jdk-alpine
 
 LABEL maintainer="ySenih@erpya.com; EdwinBetanc0urt@outlook.com;" \
 	description="ADempiere gRPC All In One Server used as ADempiere adempiere-grpc-server"
@@ -20,6 +20,7 @@ ENV \
 	MAXIMUM_LIFETIME="6000" \
 	KEEPALIVE_TIME="360000" \
 	CONNECTION_TEST_QUERY="\"SELECT 1\"" \
+	JAVA_OPTIONS="\"-Xms64M\" \"-Xmx1512M\"" \
 	SYSTEM_LOGO_URL="" \
 	TZ="America/Caracas"
 
@@ -28,11 +29,14 @@ EXPOSE ${SERVER_PORT}
 
 # Add operative system dependencies
 RUN rm -rf /tmp/* && \
-	apk update && apk add --no-cache \
+	apk update && \
+	apk add --no-cache \
 		tzdata \
 		bash \
 		fontconfig \
-		ttf-dejavu && \
+		ttf-dejavu \
+		msttcorefonts-installer && \
+	fc-cache -f && \
 	echo "Set Timezone..." && \
 	echo $TZ > /etc/timezone
 
@@ -45,6 +49,7 @@ COPY docker/env.yaml /opt/apps/server/env.yaml
 COPY docker/start.sh /opt/apps/server/start.sh
 
 
+# Add adempiere as user
 RUN addgroup adempiere && \
 	adduser --disabled-password --gecos "" --ingroup adempiere --no-create-home adempiere && \
 	chown -R adempiere /opt/apps/server/ && \

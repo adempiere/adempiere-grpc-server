@@ -25,6 +25,7 @@ import org.spin.backend.grpc.field.business_partner.BusinessPartnerAddressLocati
 import org.spin.backend.grpc.field.business_partner.BusinessPartnerContact;
 import org.spin.backend.grpc.field.business_partner.BusinessPartnerInfo;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 public class BusinessPartnerConvert {
@@ -45,49 +46,49 @@ public class BusinessPartnerConvert {
 		if (businessPartner == null || businessPartner.getC_BPartner_ID() <= 0) {
 			return builder;
 		}
-		MBPGroup businessPartneGroup = MBPGroup.get(Env.getCtx(), businessPartner.getC_BP_Group_ID());
+		MBPGroup businessPartnerGroup = MBPGroup.get(Env.getCtx(), businessPartner.getC_BP_Group_ID());
 
 		builder.setId(
 				businessPartner.getC_BPartner_ID()
 			)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getUUID()
 				)
 			)
 			.setDisplayValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getDisplayValue()
 				)
 			)
 			.setValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getValue()
 				)
 			)
 			.setTaxId(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getTaxID()
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getName()
 				)
 			)
 			.setName2(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getName2()
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartner.getDescription()
 				)
 			)
 			.setBusinessPartnerGroup(
-				ValueManager.validateNull(
-					businessPartneGroup.getName()
+				StringManager.getValidString(
+					businessPartnerGroup.getName()
 				)
 			)
 			.setOpenBalanceAmount(
@@ -114,6 +115,12 @@ public class BusinessPartnerConvert {
 			)
 			.setIsActive(
 				businessPartner.isActive()
+			)
+			.setIsCustomer(
+				businessPartner.isCustomer()
+			)
+			.setIsVendor(
+				businessPartner.isVendor()
 			)
 		;
 		return builder;
@@ -157,47 +164,47 @@ public class BusinessPartnerConvert {
 				businessPartnerContact.getAD_User_ID()
 			)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getUUID()
 				)
 			)
 			.setGreeting(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					greetingName
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getName()
 				)
 			)
 			.setTitle(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getTitle()
 				)
 			)
 			.setAddress(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					locationName
 				)
 			)
 			.setPhone(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getPhone()
 				)
 			)
 			.setPhone2(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getPhone2()
 				)
 			)
 			.setFax(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getFax()
 				)
 			)
 			.setEmail(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getEMail()
 				)
 			)
@@ -207,7 +214,7 @@ public class BusinessPartnerConvert {
 				)
 			)
 			.setLastResult(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerContact.getLastResult()
 				)
 			)
@@ -249,28 +256,43 @@ public class BusinessPartnerConvert {
 				businessPartnerLocation.getC_BPartner_Location_ID()
 			)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getUUID()
 				)
 			)
+			.setName(
+				StringManager.getValidString(
+					businessPartnerLocation.getName()
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					businessPartnerLocation.getDescription()
+				)
+			)
 			.setPhone(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getPhone()
 				)
 			)
 			.setPhone2(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getPhone2()
 				)
 			)
 			.setFax(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getFax()
 				)
 			)
 			.setAddress(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					locationName
+				)
+			)
+			.setMapUrl(
+				StringManager.getValidString(
+					businessPartnerLocation.getMapURL()
 				)
 			)
 			.setIsShipToAddress(
@@ -287,6 +309,12 @@ public class BusinessPartnerConvert {
 			)
 			.setIsActive(
 				businessPartnerLocation.isActive()
+			)
+			.setIsDefaultBilling(
+				businessPartnerLocation.isDefaultBilling()
+			)
+			.setIsDefaultShipping(
+				businessPartnerLocation.isDefaultShipping()
 			)
 		;
 		return builder;

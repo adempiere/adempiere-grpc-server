@@ -32,11 +32,12 @@ import org.compiere.process.ProcessInfo;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
+import org.compiere.util.Msg;
 import org.compiere.util.Util;
 import org.compiere.wf.MWorkflow;
 import org.spin.backend.grpc.common.ProcessLog;
 import org.spin.base.util.RecordUtil;
-import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.service.grpc.util.value.StringManager;
 
 /**
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
@@ -106,7 +107,7 @@ public class WorkflowUtil {
 		Properties context = Env.getCtx();
 		ProcessLog.Builder response = ProcessLog.newBuilder()
 			.setResultTableName(
-				ValueManager.validateNull(tableName)
+				StringManager.getValidString(tableName)
 			)
 		;
 		try {
@@ -168,10 +169,12 @@ public class WorkflowUtil {
 							instance.saveEx();
 							//	Set Instance
 							processInfo.setAD_PInstance_ID(instance.getAD_PInstance_ID());
-						} catch (Exception e) { 
-							processInfo.setSummary (e.getLocalizedMessage()); 
-							processInfo.setError (true); 
-							log.warning(processInfo.toString()); 
+						} catch (Exception e) {
+							processInfo.setSummary(
+								e.getLocalizedMessage()
+							);
+							processInfo.setError(true);
+							log.warning(processInfo.toString());
 							processInfo.getSummary();
 							throw new AdempiereException(e);
 						}
@@ -183,22 +186,34 @@ public class WorkflowUtil {
 					}
 					String summary = processInfo.getSummary();
 					response.setSummary(
-						ValueManager.validateNull(summary)
-					);
-					response.setIsError(processInfo.isError());
+							StringManager.getValidString(
+								Msg.parseTranslation(
+									context,
+									summary
+								)
+							)
+						)
+						.setIsError(
+							processInfo.isError()
+						)
+					;
 				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.severe(e.getLocalizedMessage());
+
 			String summary = e.getLocalizedMessage();
-			if (Util.isEmpty(summary, true)) {
-				summary = e.getLocalizedMessage();
-			}
 			response.setSummary(
-				ValueManager.validateNull(summary)
-			);
-			response.setIsError(true);
+					StringManager.getValidString(
+						Msg.parseTranslation(
+							context,
+							summary
+						)
+					)
+				)
+				.setIsError(true)
+			;
 		}
 
 		return response;

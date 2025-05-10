@@ -19,25 +19,19 @@ import java.util.Properties;
 import org.adempiere.core.domains.models.I_AD_Browse;
 import org.adempiere.core.domains.models.I_AD_Field;
 import org.adempiere.core.domains.models.I_AD_Form;
-import org.adempiere.core.domains.models.I_AD_Process;
 import org.adempiere.core.domains.models.I_AD_Tab;
 import org.adempiere.core.domains.models.I_AD_Window;
-import org.adempiere.core.domains.models.X_AD_Reference;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.MBrowse;
 import org.compiere.model.MColumn;
 import org.compiere.model.MField;
 import org.compiere.model.MForm;
-import org.compiere.model.MLookupFactory;
-import org.compiere.model.MLookupInfo;
-import org.compiere.model.MProcess;
 import org.compiere.model.MTab;
 import org.compiere.model.MTable;
 import org.compiere.model.MWindow;
 import org.compiere.model.M_Element;
 import org.compiere.model.Query;
 import org.compiere.util.CLogger;
-import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 import org.compiere.util.Language;
 import org.compiere.util.Util;
@@ -50,11 +44,11 @@ import org.spin.backend.grpc.dictionary.FieldRequest;
 import org.spin.backend.grpc.dictionary.Form;
 import org.spin.backend.grpc.dictionary.ListIdentifierColumnsRequest;
 import org.spin.backend.grpc.dictionary.ListIdentifierColumnsResponse;
+import org.spin.backend.grpc.dictionary.ListProcessesRequest;
+import org.spin.backend.grpc.dictionary.ListProcessesResponse;
 import org.spin.backend.grpc.dictionary.ListSearchFieldsRequest;
 import org.spin.backend.grpc.dictionary.ListSearchFieldsResponse;
 import org.spin.backend.grpc.dictionary.Process;
-import org.spin.backend.grpc.dictionary.Reference;
-import org.spin.backend.grpc.dictionary.ReferenceRequest;
 import org.spin.backend.grpc.dictionary.Tab;
 import org.spin.backend.grpc.dictionary.Window;
 
@@ -163,56 +157,9 @@ public class Dictionary extends DictionaryImplBase {
 
 
 	@Override
-	public void getReference(ReferenceRequest request, StreamObserver<Reference> responseObserver) {
-		try {
-			Reference.Builder fieldBuilder = getReference(Env.getCtx(), request);
-			responseObserver.onNext(fieldBuilder.build());
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
-			e.printStackTrace();
-			responseObserver.onError(
-				Status.INTERNAL
-					.withDescription(e.getLocalizedMessage())
-					.withCause(e)
-					.asRuntimeException()
-			);
-		}
-	}
-
-	/**
-	 * Convert reference from a request
-	 * @param context
-	 * @param request
-	 * @return
-	 */
-	private Reference.Builder getReference(Properties context, ReferenceRequest request) {
-		Reference.Builder builder = Reference.newBuilder();
-		MLookupInfo info = null;
-		if(request.getId() > 0) {
-			X_AD_Reference reference = new X_AD_Reference(context, request.getId(), null);
-			if(reference.getValidationType().equals(X_AD_Reference.VALIDATIONTYPE_TableValidation)) {
-				info = MLookupFactory.getLookupInfo(context, 0, 0, DisplayType.Search, Language.getLanguage(Env.getAD_Language(context)), null, reference.getAD_Reference_ID(), false, null, false);
-			} else if(reference.getValidationType().equals(X_AD_Reference.VALIDATIONTYPE_ListValidation)) {
-				info = MLookupFactory.getLookup_List(Language.getLanguage(Env.getAD_Language(context)), reference.getAD_Reference_ID());
-			}
-		} else if(!Util.isEmpty(request.getColumnName())) {
-			info = MLookupFactory.getLookupInfo(context, 0, 0, DisplayType.TableDir, Language.getLanguage(Env.getAD_Language(context)), request.getColumnName(), 0, false, null, false);
-		}
-
-		if (info != null) {
-			builder = DictionaryConvertUtil.convertReference(context, info);
-		}
-
-		return builder;
-	}
-
-
-
-	@Override
 	public void getProcess(EntityRequest request, StreamObserver<Process> responseObserver) {
 		try {
-			Process.Builder processBuilder = getProcess(Env.getCtx(), request.getId(), true);
+			Process.Builder processBuilder = DictionaryServiceLogic.getProcess(Env.getCtx(), request.getId(), true);
 			responseObserver.onNext(processBuilder.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
@@ -227,31 +174,24 @@ public class Dictionary extends DictionaryImplBase {
 		}
 	}
 
-	/**
-	 * Convert Process from UUID
-	 * @param id
-	 * @param withParameters
-	 * @return
-	 */
-	private Process.Builder getProcess(Properties context, String processUuid, boolean withParameters) {
-		if (Util.isEmpty(processUuid, true)) {
-			throw new AdempiereException("@FillMandatory@ @AD_Process_ID@ / @UUID@");
+	@Override
+	public void listProcesses(ListProcessesRequest request, StreamObserver<ListProcessesResponse> responseObserver) {
+		try {
+			ListProcessesResponse.Builder processBuilder = DictionaryServiceLogic.listProcesses(request);
+			responseObserver.onNext(processBuilder.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
 		}
-		int processId = RecordUtil.getIdFromUuid(I_AD_Process.Table_Name, processUuid, null);
-		if (processId <= 0) {
-			throw new AdempiereException("@FillMandatory@ @AD_Process_ID@");
-		}
-		MProcess process = MProcess.get(context, processId);
-		if (process == null || process.getAD_Process_ID() <= 0) {
-			throw new AdempiereException("@AD_Process_ID@ @NotFound@");
-		}
-		//	Convert
-		return ProcessConvertUtil.convertProcess(
-			context,
-			process,
-			withParameters
-		);
 	}
+
 
 
 	@Override

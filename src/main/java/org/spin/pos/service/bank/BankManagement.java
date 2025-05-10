@@ -36,7 +36,7 @@ import org.spin.grpc.service.core_functionality.CoreFunctionalityConvert;
 import org.spin.pos.util.POSConvertUtil;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
-import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.service.grpc.util.value.StringManager;
 
 /**
  * A util class for change values for documents
@@ -59,11 +59,8 @@ public class BankManagement {
 		List<Object> filtersList = new ArrayList<>();
 
 		String whereClause = "BankType = 'B' ";
-		final String searchValue = ValueManager.getDecodeUrl(
-			request.getSearchValue()
-		);
-		if (!Util.isEmpty(searchValue, true)) {
-			filtersList.add(searchValue);
+		if (!Util.isEmpty(request.getSearchValue(), false)) {
+			filtersList.add(request.getSearchValue());
 			whereClause += "AND UPPER(Name) LIKE '%' || UPPER(?) || '%' ";
 		}
 
@@ -88,7 +85,7 @@ public class BankManagement {
 		ListBanksResponse.Builder builderList = ListBanksResponse.newBuilder()
 			.setRecordCount(recordCount)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -113,11 +110,8 @@ public class BankManagement {
 		List<Object> filtersList = new ArrayList<>();
 		filtersList.add(bank.getC_Bank_ID());
 		String whereClause = "C_Bank_ID = ? ";
-		final String searchValue = ValueManager.getDecodeUrl(
-			request.getSearchValue()
-		);
-		if (!Util.isEmpty(searchValue, true)) {
-			filtersList.add(searchValue);
+		if (!Util.isEmpty(request.getSearchValue(), false)) {
+			filtersList.add(request.getSearchValue());
 			whereClause = "AND UPPER(Name) LIKE '%' || UPPER(?) || '%' ";
 		}
 

@@ -99,6 +99,34 @@ public class ReferenceUtil {
 		return false;
 	}
 
+	public static int overwriteDisplayType(int displayTypeId, int referenceValueId) {
+		int newDisplayType = displayTypeId;
+		if (DisplayType.Button == displayTypeId) {
+			//	Reference Value
+			if (referenceValueId > 0) {
+				X_AD_Reference reference = new X_AD_Reference(
+					Env.getCtx(),
+					referenceValueId,
+					null
+				);
+				if (reference != null && reference.getAD_Reference_ID() > 0) {
+					// overwrite display type to Table or List
+					if (X_AD_Reference.VALIDATIONTYPE_TableValidation.equals(reference.getValidationType())) {
+						newDisplayType = DisplayType.Table;
+					} else {
+						newDisplayType = DisplayType.List;
+					}
+				}
+			}
+		} else if (DisplayType.TableDir == displayTypeId) {
+			if (referenceValueId > 0) {
+				// overwrite display type to Table (as C_DocTypeTarget_ID > C_DocType_ID)
+				newDisplayType = DisplayType.Table;
+			}
+		}
+		return newDisplayType;
+	}
+
 	/**
 	 * Get Reference information, can return null if reference is invalid or not exists
 	 * @param referenceId
@@ -195,8 +223,8 @@ public class ReferenceUtil {
 			final String displaColumn = getDisplayColumnSQLLocation(tableName, columnName);
 			referenceInfo.setDisplayColumnValue("(" + displaColumn + ")");
 			referenceInfo.setHasJoinValue(false);
-		} else if(DisplayType.TableDir == referenceId
-				|| referenceValueId == 0) {
+		} else if((DisplayType.TableDir == referenceId || (DisplayType.Table == referenceId || DisplayType.Search == referenceId)
+			&& columnName.endsWith("_ID")) && referenceValueId <= 0) {
 			//	Add Display
 			final String displayColumn = MLookupFactory.getLookup_TableDirEmbed(languageValue, columnName, tableName);
 			referenceInfo.setDisplayColumnValue("(" + displayColumn + ")");
@@ -302,7 +330,7 @@ public class ReferenceUtil {
 
 			int endIndex = inStr.indexOf('@');                     // next @
 			if (endIndex < 0) {
-				token = "";                                 //  no second tag
+				token = "";                                 // no second tag
 				endIndex = index + 1;
 			} else {
 				token = inStr.substring(0, endIndex);
@@ -464,7 +492,7 @@ public class ReferenceUtil {
 			lookupInformation = getLookupInfoFromColumnName(columnName);
 		} else {
 			//	Get info
-			lookupInformation = getLookupInfoFromReference(referenceValueId);	
+			lookupInformation = getLookupInfoFromReference(referenceValueId);
 		}
 
 		// without lookup info
@@ -481,6 +509,8 @@ public class ReferenceUtil {
 		// set new query
 		lookupInformation.Query = queryForLookup;
 		lookupInformation.QueryDirect = directQuery;
+		lookupInformation.DisplayType = referenceId;
+		lookupInformation.AD_Reference_Value_ID = referenceValueId;
 
 		MValRule validationRule = null;
 		//	For validation rule
@@ -488,21 +518,23 @@ public class ReferenceUtil {
 			validationRule = MValRule.get(Env.getCtx(), validationRuleId);
 			if (validationRule != null) {
 				if (!Util.isEmpty(validationRule.getCode(), true)) {
-					String dynamicValidation =  validationRule.getCode();
+					String dynamicValidation = validationRule.getCode();
 					if (!validationRule.getCode().startsWith("(")) {
 						dynamicValidation = "(" + validationRule.getCode() + ")";
 					}
-					// table validation
-					if (!Util.isEmpty(lookupInformation.ValidationCode, true)) {
-						dynamicValidation += " AND (" + lookupInformation.ValidationCode + ")";
-					}
+					// // table validation
+					// if (!Util.isEmpty(lookupInformation.ValidationCode, true)) {
+					// 	dynamicValidation += " AND (" + lookupInformation.ValidationCode + ")";
+					// }
 					// overwrite ValidationCode with table validation on reference and dynamic validation
 					lookupInformation.ValidationCode = dynamicValidation;
 				}
 			}
 		}
 		if (!Util.isEmpty(customRestriction, true)) {
-			if (!Util.isEmpty(lookupInformation.ValidationCode) && !customRestriction.trim().startsWith("AND")) {
+			if (!Util.isEmpty(lookupInformation.ValidationCode)
+				&& !(customRestriction.trim().startsWith("AND ") || customRestriction.trim().startsWith("OR "))
+			 ) {
 				lookupInformation.ValidationCode += " AND ";
 			}
 			lookupInformation.ValidationCode += " (" + customRestriction + ")";

@@ -49,6 +49,7 @@ import org.spin.grpc.service.WebStore;
 import org.spin.grpc.service.Workflow;
 import org.spin.grpc.service.core_functionality.CoreFunctionality;
 import org.spin.grpc.service.dictionary.Dictionary;
+import org.spin.grpc.service.display_definition.DisplayDefinition;
 import org.spin.grpc.service.field.business_partner.BusinessPartnerInfo;
 import org.spin.grpc.service.field.field_management.FieldManagementService;
 import org.spin.grpc.service.field.in_out.InOutInfoService;
@@ -65,6 +66,7 @@ import org.spin.grpc.service.form.bank_statement_match.BankStatementMatch;
 import org.spin.grpc.service.form.import_file_loader.ImportFileLoader;
 import org.spin.grpc.service.form.issue_management.IssueManagement;
 import org.spin.grpc.service.form.match_po_receipt_invoice.MatchPOReceiptInvoice;
+import org.spin.grpc.service.form.out_bound_order.OutBoundOrderService;
 import org.spin.grpc.service.form.payroll_action_notice.PayrollActionNotice;
 import org.spin.grpc.service.form.task_management.TaskManagement;
 import org.spin.grpc.service.form.trial_balance_drillable.TrialBalanceDrillable;
@@ -184,6 +186,9 @@ public class AllInOneServices {
 		//	Dictionary
 		serverBuilder.addService(new Dictionary());
 		logger.info("Service " + Dictionary.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
+		//	Display Definition
+		serverBuilder.addService(new DisplayDefinition());
+		logger.info("Service " + DisplayDefinition.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	Enrollment
 		serverBuilder.addService(new Enrollment());
 		logger.info("Service " + Enrollment.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
@@ -235,6 +240,9 @@ public class AllInOneServices {
 		//	Order Field
 		serverBuilder.addService(new OrderInfoService());
 		logger.info("Service " + OrderInfoService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
+		//	Out Bound Order
+		serverBuilder.addService(new OutBoundOrderService());
+		logger.info("Service " + OutBoundOrderService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	Payment
 		serverBuilder.addService(new PaymentInfoService());
 		logger.info("Service " + PaymentInfoService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());

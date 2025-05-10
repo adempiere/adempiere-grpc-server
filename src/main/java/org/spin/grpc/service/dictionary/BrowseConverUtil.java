@@ -15,9 +15,12 @@
 package org.spin.grpc.service.dictionary;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.adempiere.model.MBrowse;
 import org.adempiere.model.MBrowseField;
@@ -37,14 +40,87 @@ import org.spin.backend.grpc.dictionary.DependentField;
 import org.spin.backend.grpc.dictionary.DictionaryEntity;
 import org.spin.backend.grpc.dictionary.Field;
 import org.spin.backend.grpc.dictionary.Reference;
+import org.spin.backend.grpc.dictionary.Table;
 import org.spin.base.db.QueryUtil;
 import org.spin.base.util.ContextManager;
 import org.spin.base.util.ReferenceUtil;
 import org.spin.dictionary.custom.BrowseFieldCustomUtil;
 import org.spin.service.grpc.util.db.OrderByUtil;
-import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 
 public class BrowseConverUtil {
+
+	public static Table.Builder convertTable(MTable table) {
+		Table.Builder builder = Table.newBuilder();
+		if (table == null || table.getAD_Table_ID() <= 0) {
+			return builder;
+		}
+		List<String> selectionColums = table.getColumnsAsList(true).stream()
+			.filter(column -> {
+				return column.isSelectionColumn();
+			})
+			.map(column -> {
+				return column.getColumnName();
+			})
+			.collect(Collectors.toList())
+		;
+		List<String> identifierColumns = table.getColumnsAsList(false).stream()
+			.filter(column -> {
+				return column.isIdentifier();
+			})
+			.sorted(Comparator.comparing(MColumn::getSeqNo))
+			.map(column -> {
+				return column.getColumnName();
+			})
+			.collect(Collectors.toList())
+		;
+		builder.setId(
+				StringManager.getValidString(
+					table.getUUID()
+				)
+			)
+			.setUuid(
+				StringManager.getValidString(
+					table.getUUID()
+				)
+			)
+			.setInternalId(
+				table.getAD_Table_ID()
+			)
+			.setTableName(
+				StringManager.getValidString(
+					table.getTableName()
+				)
+			)
+			.setAccessLevel(
+				NumberManager.getIntFromString(
+					table.getAccessLevel()
+				)
+			)
+			.addAllKeyColumns(
+				Arrays.asList(
+					table.getKeyColumns()
+				)
+			)
+			.setIsView(
+				table.isView()
+			)
+			.setIsDocument(
+				table.isDocument()
+			)
+			.setIsDeleteable(
+				table.isDeleteable()
+			)
+			.setIsChangeLog(
+				table.isChangeLog()
+			)
+			.addAllIdentifierColumns(identifierColumns)
+			.addAllSelectionColumns(selectionColums)
+		;
+
+		return builder;
+	}
 
 	/**
 	 * Convert process to builder
@@ -64,11 +140,11 @@ public class BrowseConverUtil {
 		String orderByClause = OrderByUtil.getBrowseOrderBy(browser);
 		Browser.Builder builder = Browser.newBuilder()
 			.setId(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					browser.getUUID()
 				))
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					browser.getUUID()
 				)
 			)
@@ -76,16 +152,26 @@ public class BrowseConverUtil {
 				browser.getAD_Browse_ID()
 			)
 			.setCode(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					browser.getValue()
 				)
 			)
 			.setName(browser.getName())
 			.setDescription(
-				ValueManager.validateNull(browser.getDescription())
+				StringManager.getValidString(
+					browser.getDescription()
+				)
 			)
 			.setHelp(
-				ValueManager.validateNull(browser.getHelp())
+				StringManager.getValidString(
+					browser.getHelp()
+				)
+			)
+			.setIsActive(
+				browser.isActive()
+			)
+			.setIsBetaFunctionality(
+				browser.isBetaFunctionality()
 			)
 			.setAccessLevel(Integer.parseInt(browser.getAccessLevel()))
 			.setIsCollapsibleByDefault(browser.isCollapsibleByDefault())
@@ -108,7 +194,7 @@ public class BrowseConverUtil {
 		if (fieldKey != null && fieldKey.get_ID() > 0) {
 			MViewColumn viewColumn = MViewColumn.getById(context, fieldKey.getAD_View_Column_ID(), null);
 			builder.setFieldKey(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					viewColumn.getColumnName()
 				)
 			);
@@ -117,9 +203,18 @@ public class BrowseConverUtil {
 		if (browser.getAD_Table_ID() > 0) {
 			MTable table = MTable.get(browser.getCtx(), browser.getAD_Table_ID());
 			builder.setTableName(
-				ValueManager.validateNull(table.getTableName())
-			);
+					StringManager.getValidString(
+						table.getTableName()
+					)
+				)
+				.setTable(
+					convertTable(
+						table
+					)
+				)
+			;
 		}
+
 		//	Window Reference
 		if(browser.getAD_Window_ID() > 0) {
 			MWindow window = MWindow.get(
@@ -131,6 +226,7 @@ public class BrowseConverUtil {
 			);
 			builder.setWindow(windowBuilder.build());
 		}
+
 		//	Process Reference
 		if(browser.getAD_Process_ID() > 0) {
 			MProcess process = MProcess.get(
@@ -140,8 +236,24 @@ public class BrowseConverUtil {
 			DictionaryEntity.Builder processBuilder = DictionaryConvertUtil.getDictionaryEntity(
 				process
 			);
-			builder.setProcess(processBuilder.build());
+			builder.setProcessId(
+					process.getAD_Process_ID()
+				)
+				.setProcessUuid(
+					StringManager.getValidString(
+						process.getUUID()
+					)
+				)
+				.setProcess(
+					processBuilder.build()
+				)
+			;
 		}
+
+		//	Search process
+		boolean isSearchProcess = browser.get_ColumnIndex("SearchProcess_ID") >= 0 && browser.get_ValueAsBoolean("SearchProcess_ID");
+		builder.setIsSearchProcess(isSearchProcess);
+
 		//	For parameters
 		if(withFields) {
 			List<MBrowseField> browseFields = browser.getFields();
@@ -181,11 +293,11 @@ public class BrowseConverUtil {
 		//	Convert
 		Field.Builder builder = Field.newBuilder()
 			.setId(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					browseField.getUUID()
 				))
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					browseField.getUUID()
 				)
 			)
@@ -193,22 +305,34 @@ public class BrowseConverUtil {
 				browseField.getAD_Browse_Field_ID()
 			)
 			.setName(
-				ValueManager.validateNull(browseField.getName())
+				StringManager.getValidString(
+					browseField.getName()
+				)
 			)
 			.setDescription(
-				ValueManager.validateNull(browseField.getDescription())
+				StringManager.getValidString(
+					browseField.getDescription()
+				)
 			)
 			.setHelp(
-				ValueManager.validateNull(browseField.getHelp())
+				StringManager.getValidString(
+					browseField.getHelp()
+				)
 			)
 			.setDefaultValue(
-				ValueManager.validateNull(browseField.getDefaultValue())
+				StringManager.getValidString(
+					browseField.getDefaultValue()
+				)
 			)
 			.setDefaultValueTo(
-				ValueManager.validateNull(browseField.getDefaultValue2())
+				StringManager.getValidString(
+					browseField.getDefaultValue2()
+				)
 			)
 			.setDisplayLogic(
-				ValueManager.validateNull(browseField.getDisplayLogic())
+				StringManager.getValidString(
+					browseField.getDisplayLogic()
+				)
 			)
 			.setDisplayType(browseField.getAD_Reference_ID())
 			.setIsDisplayed(browseField.isDisplayed())
@@ -219,23 +343,33 @@ public class BrowseConverUtil {
 			.setIsRange(browseField.isRange())
 			.setIsReadOnly(browseField.isReadOnly())
 			.setReadOnlyLogic(
-				ValueManager.validateNull(browseField.getReadOnlyLogic())
+				StringManager.getValidString(
+					browseField.getReadOnlyLogic()
+				)
 			)
 			.setIsKey(browseField.isKey())
 			.setIsIdentifier(browseField.isIdentifier())
-			.setSeqNoGrid(browseField.getSeqNoGrid())
+			.setGridSequence(browseField.getSeqNoGrid())
 			.setSequence(browseField.getSeqNo())
 			.setValueMax(
-				ValueManager.validateNull(browseField.getValueMax())
+				StringManager.getValidString(
+					browseField.getValueMax()
+				)
 			)
 			.setValueMin(
-				ValueManager.validateNull(browseField.getValueMin())
+				StringManager.getValidString(
+					browseField.getValueMin()
+				)
 			)
 			.setVFormat(
-				ValueManager.validateNull(browseField.getVFormat())
+				StringManager.getValidString(
+					browseField.getVFormat()
+				)
 			)
 			.setCallout(
-				ValueManager.validateNull(browseField.getCallout())
+				StringManager.getValidString(
+					browseField.getCallout()
+				)
 			)
 			.setFieldLength(browseField.getFieldLength())
 			.addAllContextColumnNames(
@@ -248,7 +382,9 @@ public class BrowseConverUtil {
 		
 		MViewColumn viewColumn = MViewColumn.getById(context, browseField.getAD_View_Column_ID(), null);
 		builder.setColumnName(
-			ValueManager.validateNull(viewColumn.getColumnName())
+			StringManager.getValidString(
+				viewColumn.getColumnName()
+			)
 		);
 		String elementName = null;
 		if(viewColumn.getAD_Column_ID() != 0) {
@@ -261,11 +397,14 @@ public class BrowseConverUtil {
 			elementName = browseField.getAD_Element().getColumnName();
 		}
 		builder.setElementName(
-			ValueManager.validateNull(elementName))
+			StringManager.getValidString(elementName))
 		;
 
-		//	
-		int displayTypeId = browseField.getAD_Reference_ID();
+		// overwrite display type `Button` to `List`, example `PaymentRule` or `Posted`
+		int displayTypeId = ReferenceUtil.overwriteDisplayType(
+			browseField.getAD_Reference_ID(),
+			browseField.getAD_Reference_Value_ID()
+		);
 		if (ReferenceUtil.validateReference(displayTypeId)) {
 			//	Reference Value
 			int referenceValueId = browseField.getAD_Reference_Value_ID();
@@ -295,7 +434,7 @@ public class BrowseConverUtil {
 			// ASP default displayed field as panel
 			if (browseFieldCustom.get_ColumnIndex(org.spin.dictionary.util.DictionaryUtil.IS_DISPLAYED_AS_PANEL_COLUMN_NAME) >= 0) {
 				builder.setIsDisplayedAsPanel(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						browseFieldCustom.get_ValueAsString(
 							org.spin.dictionary.util.DictionaryUtil.IS_DISPLAYED_AS_PANEL_COLUMN_NAME
 						)
@@ -305,7 +444,7 @@ public class BrowseConverUtil {
 			// ASP default displayed field as table
 			if (browseFieldCustom.get_ColumnIndex(org.spin.dictionary.util.DictionaryUtil.IS_DISPLAYED_AS_TABLE_COLUMN_NAME) >= 0) {
 				builder.setIsDisplayedAsTable(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						browseFieldCustom.get_ValueAsString(
 							org.spin.dictionary.util.DictionaryUtil.IS_DISPLAYED_AS_TABLE_COLUMN_NAME
 						)
@@ -402,12 +541,12 @@ public class BrowseConverUtil {
 				final String currentColumnName = currentViewColumn.getColumnName();
 				DependentField.Builder builder = DependentField.newBuilder()
 					.setId(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							currentBrowseField.getUUID()
 						)
 					)
 					.setUuid(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							currentBrowseField.getUUID()
 						)
 					)
@@ -421,12 +560,12 @@ public class BrowseConverUtil {
 						browse.getAD_Browse_ID()
 					)
 					.setParentUuid(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							browse.getUUID()
 						)
 					)
 					.setParentName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							browse.getName()
 						)
 					)

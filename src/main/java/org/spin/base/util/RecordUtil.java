@@ -35,7 +35,9 @@ import java.util.stream.Collectors;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.pipo.IDFinder;
+import org.adempiere.core.domains.models.I_AD_ChangeLog;
 import org.adempiere.core.domains.models.I_AD_Element;
+import org.adempiere.core.domains.models.I_AD_Table;
 import org.adempiere.core.domains.models.I_C_Order;
 import org.adempiere.core.domains.models.X_AD_Table;
 import org.compiere.model.MClient;
@@ -59,6 +61,7 @@ import org.spin.service.grpc.util.db.FromUtil;
 import org.spin.service.grpc.util.db.OrderByUtil;
 import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -219,9 +222,39 @@ public class RecordUtil {
 		}
 		return table;
 	}
+	/**
+	 * Validate tableName and MTable, and get instance
+	 * @param tableId
+	 * @return
+	 */
+	public static MTable validateAndGetTable(int tableId) {
+		if (tableId <= 0) {
+			throw new AdempiereException("@FillMandatory@ @AD_Table_ID@");
+		}
+		MTable table = MTable.get(Env.getCtx(), tableId);
+		if (table == null || table.getAD_Table_ID() <= 0) {
+			throw new AdempiereException("@AD_Table_ID@ @NotFound@");
+		}
+		return table;
+	}
 
 
+	/**
+	 * Evaluate if is valid identifier
+	 * @param id
+	 * @param table
+	 * @return
+	 */
+	public static boolean isValidId(int id, MTable table) {
+		if (table == null || table.getAD_Table_ID() <= 0) {
+			return false;
+		}
 
+		return isValidId(
+			id,
+			table.getAccessLevel()
+		);
+	}
 	/**
 	 * Evaluate if is valid identifier
 	 * @param id
@@ -653,6 +686,12 @@ public class RecordUtil {
 							final int identifier = rs.getInt(index);
 							entityBuilder.setId(identifier);
 						}
+						if (I_AD_Element.COLUMNNAME_UUID.toLowerCase().equals(columnName.toLowerCase())) {
+							final String uuid = rs.getString(index);
+							entityBuilder.setUuid(
+								StringManager.getValidString(uuid)
+							);
+						}
 						//	From field
 						String fieldColumnName = field.getColumnName();
 						Object value = rs.getObject(index);
@@ -667,14 +706,15 @@ public class RecordUtil {
 
 						// to add client uuid by record
 						if (fieldColumnName.equals(I_AD_Element.COLUMNNAME_AD_Client_ID)) {
-							MClient entity = MClient.get(
+							final int clientId = NumberManager.getIntegerFromObject(value);
+							MClient clientEntity = MClient.get(
 								table.getCtx(),
-								NumberManager.getIntegerFromObject(value)
+								clientId
 							);
-							if (entity != null) {
-								Value.Builder valueUuidBuilder = ValueManager.getValueFromReference(
-									entity.get_UUID(),
-									DisplayType.String
+							if (clientEntity != null) {
+								final String clientUuid = clientEntity.get_UUID();
+								Value.Builder valueUuidBuilder = ValueManager.getValueFromString(
+									clientUuid
 								);
 								rowValues.putFields(
 									LookupUtil.getUuidColumnName(
@@ -682,6 +722,26 @@ public class RecordUtil {
 									),
 									valueUuidBuilder.build()
 								);
+							}
+						} else if (fieldColumnName.equals(I_AD_ChangeLog.COLUMNNAME_Record_ID)) {
+							if (rs.getInt(I_AD_Table.COLUMNNAME_AD_Table_ID) > 0) {
+								MTable tableRow = MTable.get(table.getCtx(), rs.getInt(I_AD_Table.COLUMNNAME_AD_Table_ID));
+								if (tableRow != null) {
+									PO entityRow = tableRow.getPO(rs.getInt(I_AD_ChangeLog.COLUMNNAME_Record_ID), null);
+									if (entityRow != null) {
+										final String recordIdDisplayValue = entityRow.getDisplayValue();
+										Value.Builder recordIdDisplayBuilder = ValueManager.getValueFromString(
+											recordIdDisplayValue
+										);
+										rowValues.putFields(
+											LookupUtil.getDisplayColumnName(
+												I_AD_ChangeLog.COLUMNNAME_Record_ID
+											),
+											recordIdDisplayBuilder.build()
+										);
+									}
+
+								}
 							}
 						}
 					} catch (Exception e) {

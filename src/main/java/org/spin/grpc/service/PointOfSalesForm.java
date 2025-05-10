@@ -35,9 +35,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.adempiere.core.domains.models.I_AD_PrintFormatItem;
-import org.adempiere.core.domains.models.I_AD_Ref_List;
 import org.adempiere.core.domains.models.I_AD_User;
 import org.adempiere.core.domains.models.I_C_BP_BankAccount;
+import org.adempiere.core.domains.models.I_C_BPartner;
 import org.adempiere.core.domains.models.I_C_ConversionType;
 import org.adempiere.core.domains.models.I_C_Currency;
 import org.adempiere.core.domains.models.I_C_Invoice;
@@ -62,10 +62,12 @@ import org.compiere.model.MBankStatement;
 import org.compiere.model.MColumn;
 import org.compiere.model.MConversionRate;
 import org.compiere.model.MCurrency;
+import org.compiere.model.MDiscountSchema;
 import org.compiere.model.MDocType;
 import org.compiere.model.MInOut;
 import org.compiere.model.MInOutLine;
 import org.compiere.model.MLocation;
+import org.compiere.model.MMenu;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MPOS;
@@ -77,6 +79,7 @@ import org.compiere.model.MProductPrice;
 import org.compiere.model.MProductPricing;
 import org.compiere.model.MResourceAssignment;
 import org.compiere.model.MStorage;
+import org.compiere.model.MTab;
 import org.compiere.model.MTable;
 import org.compiere.model.MTax;
 import org.compiere.model.MUOM;
@@ -92,6 +95,7 @@ import org.compiere.util.DB;
 import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 import org.compiere.util.MimeType;
+import org.compiere.util.Msg;
 import org.compiere.util.TimeUtil;
 import org.compiere.util.Trx;
 import org.compiere.util.Util;
@@ -116,8 +120,10 @@ import org.spin.pos.service.order.OrderUtil;
 import org.spin.pos.service.order.RMAUtil;
 import org.spin.pos.service.order.ReturnSalesOrder;
 import org.spin.pos.service.order.ReverseSalesTransaction;
+import org.spin.pos.service.order.ShipmentUtil;
 import org.spin.pos.service.pos.POS;
 import org.spin.pos.util.ColumnsAdded;
+import org.spin.pos.util.OrderConverUtil;
 import org.spin.pos.util.POSConvertUtil;
 import org.spin.pos.util.PaymentConvertUtil;
 import org.spin.pos.util.TicketHandler;
@@ -125,10 +131,11 @@ import org.spin.pos.util.TicketResult;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.CountUtil;
 import org.spin.service.grpc.util.db.LimitUtil;
+import org.spin.service.grpc.util.value.BooleanManager;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.TimeManager;
 import org.spin.service.grpc.util.value.ValueManager;
-import org.spin.store.model.MCPaymentMethod;
 import org.spin.store.util.VueStoreFrontUtil;
 
 import com.google.protobuf.ByteString;
@@ -223,22 +230,242 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
+
 	@Override
 	public void getOrder(GetOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder order = ConvertUtil.convertOrder(getOrder(request.getId(), null));
+			Order.Builder order = OrderConverUtil.convertOrder(
+				getOrder(
+					request.getId(),
+					null
+				)
+			);
 			responseObserver.onNext(order.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+
+
+	@Override
+	public void createGiftCard(CreateGiftCardRequest request, StreamObserver<GiftCard> responseObserver) {
+		try {
+			GiftCard.Builder giftCard = POSLogic.createGiftCard(request);
+			responseObserver.onNext(giftCard.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void getGiftCard(GetGiftCardRequest request, StreamObserver<GiftCard> responseObserver) {
+		try {
+			GiftCard.Builder giftCard = POSLogic.getGiftCard(request.getId(), null);
+			responseObserver.onNext(giftCard.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void listGiftCards(ListGiftCardsRequest request, StreamObserver<ListGiftCardsResponse> responseObserver) {
+		try {
+			ListGiftCardsResponse.Builder listGiftCards = POSLogic.listGiftCards(request);
+			responseObserver.onNext(listGiftCards.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void updateGiftCard(UpdateGiftCardRequest request, StreamObserver<GiftCard> responseObserver) {
+		try {
+			GiftCard.Builder giftCard = POSLogic.updateGiftCard(request);
+			responseObserver.onNext(giftCard.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void deleteGiftCard(DeleteGiftCardRequest request, StreamObserver<Empty> responseObserver) {
+		try {
+			Empty.Builder orderLine = POSLogic.deleteGiftCard(request);
+			responseObserver.onNext(orderLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+
+
+	@Override
+	public void createGiftCardLine(CreateGiftCardLineRequest request, StreamObserver<GiftCardLine> responseObserver) {
+		try {
+			GiftCardLine.Builder giftCardLine = POSLogic.createAndConvertGiftCardLine(request);
+			responseObserver.onNext(giftCardLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void getGiftCardLine(GetGiftCardLineRequest request, StreamObserver<GiftCardLine> responseObserver) {
+		try {
+			GiftCardLine.Builder giftCardLine = POSLogic.getGiftCardLine(request.getId(), null);
+			responseObserver.onNext(giftCardLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void listGiftCardLines(ListGiftCardLinesRequest request, StreamObserver<ListGiftCardLinesResponse> responseObserver) {
+		try {
+			ListGiftCardLinesResponse.Builder listGiftCardLines = POSLogic.listGiftCardLines(request);
+			responseObserver.onNext(listGiftCardLines.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void updateGiftCardLine(UpdateGiftCardLineRequest request, StreamObserver<GiftCardLine> responseObserver) {
+		try {
+			GiftCardLine.Builder giftCardLine = POSLogic.updateGiftCardLine(request);
+			responseObserver.onNext(giftCardLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void deleteGiftCardLine(DeleteGiftCardLineRequest request, StreamObserver<Empty> responseObserver) {
+		try {
+			Empty.Builder giftCardLine = POSLogic.deleteGiftCardLine(request);
+			responseObserver.onNext(giftCardLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void listAvailableOrderLinesForGiftCard(ListAvailableOrderLinesForGiftCardRequest request, StreamObserver<ListAvailableOrderLinesForGiftCardResponse> responseObserver) {
+		try {
+			ListAvailableOrderLinesForGiftCardResponse.Builder listAvailableOrderLines = POSLogic.listAvailableOrderLinesForGiftCard(request);
+			responseObserver.onNext(listAvailableOrderLines.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+					Status.INTERNAL
+							.withDescription(e.getLocalizedMessage())
+							.withCause(e)
+							.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void listAvailableOrderLinesForRMA(ListAvailableOrderLinesForRMARequest request, StreamObserver<ListAvailableOrderLinesForRMAResponse> responseObserver) {
+		try {
+			ListAvailableOrderLinesForRMAResponse.Builder listAvailableOrderLines = POSLogic.listAvailableOrderLinesForRMA(request);
+			responseObserver.onNext(listAvailableOrderLines.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+					Status.INTERNAL
+							.withDescription(e.getLocalizedMessage())
+							.withCause(e)
+							.asRuntimeException()
+			);
+		}
+	}
+
+
+
 	@Override
 	public void createPayment(CreatePaymentRequest request, StreamObserver<Payment> responseObserver) {
 		try {
@@ -308,7 +535,66 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
+	@Override
+	public void processOnlinePayment(ProcessOnlinePaymentRequest request, StreamObserver<ProcessOnlinePaymentResponse> responseObserver) {
+		try {
+			ProcessOnlinePaymentResponse.Builder builder = POSLogic.processOnlinePayment(
+				request
+			);
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void infoOnlinePayment(InfoOnlinePaymentRequest request, StreamObserver<InfoOnlinePaymentResponse> responseObserver) {
+		try {
+			InfoOnlinePaymentResponse.Builder builder = POSLogic.infoOnlinePayment(
+				request
+			);
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void cancelOnlinePayment(CancelOnlinePaymentRequest request, StreamObserver<CancelOnlinePaymentResponse> responseObserver) {
+		try {
+			CancelOnlinePaymentResponse.Builder builder = POSLogic.cancelOnlinePayment(
+				request
+			);
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+
+
 	@Override
 	public void listOrders(ListOrdersRequest request, StreamObserver<ListOrdersResponse> responseObserver) {
 		try {
@@ -355,37 +641,51 @@ public class PointOfSalesForm extends StoreImplBase {
 	}
 
 
-
 	@Override
 	public void releaseOrder(ReleaseOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder order = ConvertUtil.convertOrder(changeOrderAssigned(request.getId()));
+			Order.Builder order = OrderConverUtil.convertOrder(
+				changeOrderAssigned(
+					request.getId()
+				)
+			);
 			responseObserver.onNext(order.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+
 	@Override
 	public void holdOrder(HoldOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder order = ConvertUtil.convertOrder(changeOrderAssigned(request.getId(), request.getSalesRepresentativeId()));
+			Order.Builder order = OrderConverUtil.convertOrder(
+				changeOrderAssigned(
+					request.getId(),
+					request.getSalesRepresentativeId()
+				)
+			);
 			responseObserver.onNext(order.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+
 	@Override
 	public void getAvailableRefund(GetAvailableRefundRequest request, StreamObserver<AvailableRefund> responseObserver) {
 		try {
@@ -410,11 +710,12 @@ public class PointOfSalesForm extends StoreImplBase {
 	private AvailableRefund.Builder getAvailableRefund(GetAvailableRefundRequest request) {
 		return AvailableRefund.newBuilder();
 	}
-	
+
+
 	@Override
 	public void processOrder(ProcessOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder order = ConvertUtil.convertOrder(
+			Order.Builder order = OrderConverUtil.convertOrder(
 				processOrder(request)
 			);
 			responseObserver.onNext(order.build());
@@ -422,13 +723,16 @@ public class PointOfSalesForm extends StoreImplBase {
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
 			e.printStackTrace();
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+
 	@Override
 	public void validatePIN(ValidatePINRequest request, StreamObserver<Empty> responseObserver) {
 		try {
@@ -443,7 +747,7 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
 	@Override
 	public void listAvailableWarehouses(ListAvailableWarehousesRequest request,
 			StreamObserver<ListAvailableWarehousesResponse> responseObserver) {
@@ -453,29 +757,15 @@ public class PointOfSalesForm extends StoreImplBase {
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
-	@Override
-	public void listAvailablePriceList(ListAvailablePriceListRequest request,
-			StreamObserver<ListAvailablePriceListResponse> responseObserver) {
-		try {
-			ListAvailablePriceListResponse.Builder priceList = listPriceList(request);
-			responseObserver.onNext(priceList.build());
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
-					.withDescription(e.getLocalizedMessage())
-					.withCause(e)
-					.asRuntimeException());
-		}
-	}
-	
+
 	@Override
 	public void listAvailablePaymentMethods(ListAvailablePaymentMethodsRequest request,
 			StreamObserver<ListAvailablePaymentMethodsResponse> responseObserver) {
@@ -485,13 +775,51 @@ public class PointOfSalesForm extends StoreImplBase {
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+	@Override
+	public void listAvailablePriceList(ListAvailablePriceListRequest request,
+			StreamObserver<ListAvailablePriceListResponse> responseObserver) {
+		try {
+			ListAvailablePriceListResponse.Builder priceList = listPriceList(request);
+			responseObserver.onNext(priceList.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void listAvailableCurrencies(ListAvailableCurrenciesRequest request,
+			StreamObserver<ListAvailableCurrenciesResponse> responseObserver) {
+		try {
+			ListAvailableCurrenciesResponse.Builder currencies = listCurrencies(request);
+			responseObserver.onNext(currencies.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
 	@Override
 	public void listAvailableDocumentTypes(ListAvailableDocumentTypesRequest request,
 			StreamObserver<ListAvailableDocumentTypesResponse> responseObserver) {
@@ -507,20 +835,22 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
 	@Override
-	public void listAvailableCurrencies(ListAvailableCurrenciesRequest request,
-			StreamObserver<ListAvailableCurrenciesResponse> responseObserver) {
+	public void listAvailableDiscounts(ListAvailableDiscountsRequest request,
+			StreamObserver<ListAvailableDiscountsResponse> responseObserver) {
 		try {
-			ListAvailableCurrenciesResponse.Builder currencies = listCurrencies(request);
-			responseObserver.onNext(currencies.build());
+			ListAvailableDiscountsResponse.Builder documentTypes = POSLogic.listAvailableDiscounts(request);
+			responseObserver.onNext(documentTypes.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
 
@@ -563,6 +893,29 @@ public class PointOfSalesForm extends StoreImplBase {
 	}
 
 
+
+	@Override
+	public void listCustomerTemplates(ListCustomerTemplatesRequest request, StreamObserver<ListCustomerTemplatesResponse> responseObserver) {
+		try {
+			ListCustomerTemplatesResponse.Builder customerTemplatesList = POSLogic.listCustomerTemplates(request);
+			responseObserver.onNext(
+				customerTemplatesList.build()
+			);
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+
+
 	@Override
 	public void printTicket(PrintTicketRequest request, StreamObserver<PrintTicketResponse> responseObserver) {
 		try {
@@ -583,8 +936,11 @@ public class PointOfSalesForm extends StoreImplBase {
 				builder
 					.setIsError(ticketResult.isError())
 					.setSummary(
-						ValueManager.validateNull(
-							ticketResult.getSummary()
+						StringManager.getValidString(
+							Msg.parseTranslation(
+								Env.getCtx(),
+								ticketResult.getSummary()
+							)
 						)
 					)
 				;
@@ -603,23 +959,26 @@ public class PointOfSalesForm extends StoreImplBase {
 						log.warning(e.getLocalizedMessage());
 						builder
 							.setSummary(
-								ValueManager.validateNull(
-									e.getLocalizedMessage()
+								StringManager.getValidString(
+									Msg.parseTranslation(
+										Env.getCtx(),
+										e.getLocalizedMessage()
+									)
 								)
 							)
 							.setIsError(true);
 					}
 					builder
 						.setFileName(
-							ValueManager.validateNull(validFileName)
+							StringManager.getValidString(validFileName)
 						)
 						.setMimeType(
-							ValueManager.validateNull(
+							StringManager.getValidString(
 								MimeType.getMimeType(validFileName)
 							)
 						)
 						.setResultType(
-							ValueManager.validateNull(fileType)
+							StringManager.getValidString(fileType)
 						)
 						.setOutputStream(resultFile)
 					;
@@ -646,29 +1005,35 @@ public class PointOfSalesForm extends StoreImplBase {
 	@Override
 	public void printPreview(PrintPreviewRequest request, StreamObserver<PrintPreviewResponse> responseObserver) {
 		try {
-			if(request.getOrderId() <= 0) {
-				log.warning("Sales Order Not Found");
+			if (request.getOrderId() <= 0) {
+				log.warning("@FillMandatory@ @sales.order@");
 				return;
 			}
+			final int orderId = request.getOrderId();
+			MOrder order = new MOrder(Env.getCtx(), orderId, null);
+			if (order == null || order.getC_Order_ID() <= 0) {
+				log.warning("@sales.order@ (" + order + ") @NotFound@");
+				return;
+			}
+
 			log.fine("Print Ticket = " + request);
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			int userId = Env.getAD_User_ID(pos.getCtx());
 			if (!getBooleanValueFromPOS(pos, userId, "IsAllowsPreviewDocument")) {
 				throw new AdempiereException("@POS.PreviewDocumentNotAllowed@");
 			}
 
-			int orderId = request.getOrderId();
-			MOrder order = new MOrder(Env.getCtx(), orderId, null);
 			PrintPreviewResponse.Builder ticket = PrintPreviewResponse.newBuilder()
-				.setResult("Ok");
+				.setResult("Ok")
+			;
 
 			// run process request
 			// Rpt C_Order
 			int processId = 110;
 			int recordId = order.getC_Order_ID();
 			String tableName = I_C_Order.Table_Name;
-			int invoiceId = order.getC_Invoice_ID();
-			
+			final int invoiceId = order.getC_Invoice_ID();
+
 			if (invoiceId > 0) {
 				// Rpt C_Invoice
 				processId = 116;
@@ -686,7 +1051,9 @@ public class PointOfSalesForm extends StoreImplBase {
 				.setReportType(reportType)
 			;
 
-			ProcessLog.Builder processLog = BusinessData.runBusinessProcess(processRequest.build());
+			ProcessLog.Builder processLog = BusinessData.runBusinessProcess(
+				processRequest.build()
+			);
 			
 			// preview document
 			ticket.setProcessLog(processLog.build());
@@ -704,26 +1071,32 @@ public class PointOfSalesForm extends StoreImplBase {
 			);
 		}
 	}
-	
+
 	@Override
 	public void printShipmentPreview(PrintShipmentPreviewRequest request, StreamObserver<PrintShipmentPreviewResponse> responseObserver) {
 		try {
-			if(request.getShipmentId() <= 0) {
-				log.warning("Shipment Not Found");
+			if (request.getShipmentId() <= 0) {
+				log.warning("@FillMandatory@ @Shipment@");
 				return;
 			}
+			final int shipmentId = request.getShipmentId();
+			MInOut shipment = new MInOut(Env.getCtx(), shipmentId, null);
+			if (shipment == null || shipment.getM_InOut_ID() <= 0) {
+				log.warning("@Shipment@ (" + shipmentId + ") @NotFound@");
+				return;
+			}
+
 			log.fine("Print Ticket = " + request);
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			int userId = Env.getAD_User_ID(pos.getCtx());
 			if (!getBooleanValueFromPOS(pos, userId, "IsAllowsPreviewDocument")) {
 				throw new AdempiereException("@POS.PreviewDocumentNotAllowed@");
 			}
 
-			int shipmentId = request.getShipmentId();
-			
 			PrintShipmentPreviewResponse.Builder ticket = PrintShipmentPreviewResponse.newBuilder()
-				.setResult("Ok");
-			
+				.setResult("Ok")
+			;
+
 			// Rpt M_InOut
 			int processId = 117;
 			String reportType = "pdf";
@@ -733,12 +1106,16 @@ public class PointOfSalesForm extends StoreImplBase {
 			RunBusinessProcessRequest.Builder processRequest = RunBusinessProcessRequest.newBuilder()
 				.setId(processId)
 				.setTableName(I_M_InOut.Table_Name)
-				.setRecordId(shipmentId)
+				.setRecordId(
+					request.getShipmentId()
+				)
 				.setReportType(reportType)
 			;
 
-			ProcessLog.Builder processLog = BusinessData.runBusinessProcess(processRequest.build());
-			
+			ProcessLog.Builder processLog = BusinessData.runBusinessProcess(
+				processRequest.build()
+			);
+
 			// preview document
 			ticket.setProcessLog(processLog.build());
 
@@ -755,6 +1132,74 @@ public class PointOfSalesForm extends StoreImplBase {
 			);
 		}
 	}
+
+	@Override
+	public void printGiftCardPreview(PrintGiftCardPreviewRequest request, StreamObserver<PrintGiftCardPreviewResponse> responseObserver) {
+		try {
+			if (request.getId() <= 0) {
+				log.warning("@FillMandatory@ @ECA14_GiftCard@");
+				return;
+			}
+			final int giftCardId = request.getId();
+			MTable giftCardTable = MTable.get(Env.getCtx(), "ECA14_GiftCard");
+			if (giftCardTable == null || giftCardTable.getAD_Table_ID() <= 0) {
+				throw new AdempiereException("@TableName@ @NotFound@");
+			}
+			PO giftCard = giftCardTable.getPO(giftCardId, null);
+			if (giftCard == null || giftCard.get_ValueAsInt("ECA14_GiftCard_ID") <= 0) {
+				log.warning("@ECA14_GiftCard_ID@ (" + giftCardId + ") @NotFound@");
+				return;
+			}
+
+			log.fine("Print Ticket = " + request);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
+			int userId = Env.getAD_User_ID(pos.getCtx());
+			if (!getBooleanValueFromPOS(pos, userId, "IsAllowsPreviewDocument")) {
+				throw new AdempiereException("@POS.PreviewDocumentNotAllowed@");
+			}
+
+			PrintGiftCardPreviewResponse.Builder ticket = PrintGiftCardPreviewResponse.newBuilder()
+					.setResult("Ok")
+					;
+
+
+
+			int giftCardTabId = 55269;
+			MTab giftCardTab = MTab.get(Env.getCtx(), giftCardTabId);
+			int processId = giftCardTab.getAD_Process_ID();
+
+			String reportType = "pdf";
+			RunBusinessProcessRequest.Builder processRequest = RunBusinessProcessRequest.newBuilder()
+					.setId(processId)
+					.setTableName(giftCardTable.get_TableName())
+					.setRecordId(
+							giftCardId
+					)
+					.setReportType(reportType)
+					;
+
+			ProcessLog.Builder processLog = BusinessData.runBusinessProcess(
+					processRequest.build()
+			);
+
+			// preview document
+			ticket.setProcessLog(processLog.build());
+
+			responseObserver.onNext(ticket.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+					Status.INTERNAL
+							.withDescription(e.getLocalizedMessage())
+							.withCause(e)
+							.asRuntimeException()
+			);
+		}
+	}
+
+
 
 	@Override
 	public void createCustomerBankAccount(CreateCustomerBankAccountRequest request, StreamObserver<CustomerBankAccount> responseObserver) {
@@ -973,7 +1418,7 @@ public class PointOfSalesForm extends StoreImplBase {
 				whereClause += " " + I_C_BP_BankAccount.COLUMNNAME_C_Bank_ID + " = ?";
 				filtersList.add(request.getBankId());
 			}
-			
+
 			// if (request.get)
 			Query query = new Query(
 				Env.getCtx(),
@@ -1009,21 +1454,23 @@ public class PointOfSalesForm extends StoreImplBase {
 				nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 			}
 			builder.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			);
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
 			e.printStackTrace();
-			responseObserver.onError(Status.INTERNAL
-				.withDescription(e.getLocalizedMessage())
-				.withCause(e)
-				.asRuntimeException()
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
 			);
 		}
 	}
-	
+
+
 	@Override
 	public void createShipment(CreateShipmentRequest request, StreamObserver<Shipment> responseObserver) {
 		try {
@@ -1038,7 +1485,7 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
 	@Override
 	public void createShipmentLine(CreateShipmentLineRequest request, StreamObserver<ShipmentLine> responseObserver) {
 		try {
@@ -1057,6 +1504,24 @@ public class PointOfSalesForm extends StoreImplBase {
 		}
 	}
 	
+	@Override
+	public void updateShipmentLine(UpdateShipmentLineRequest request, StreamObserver<ShipmentLine> responseObserver) {
+		try {
+			ShipmentLine.Builder shipmentLine = POSLogic.updateShipmentLine(request);
+			responseObserver.onNext(shipmentLine.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
 	@Override
 	public void deleteShipmentLine(DeleteShipmentLineRequest request, StreamObserver<Empty> responseObserver) {
 		try {
@@ -1119,7 +1584,42 @@ public class PointOfSalesForm extends StoreImplBase {
 			);
 		}
 	}
-
+	
+	@Override
+	public void processCashOpening(CashOpeningRequest request, StreamObserver<Empty> responseObserver) {
+		try {
+			Empty.Builder empty = processCashOpening(request);
+			responseObserver.onNext(empty.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+	
+	@Override
+	public void processCashWithdrawal(CashWithdrawalRequest request, StreamObserver<Empty> responseObserver) {
+		try {
+			Empty.Builder empty = processCashWithdrawal(request);
+			responseObserver.onNext(empty.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.severe(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
 
 	@Override
 	public void listCashMovements(ListCashMovementsRequest request, StreamObserver<ListCashMovementsResponse> responseObserver) {
@@ -1371,11 +1871,12 @@ public class PointOfSalesForm extends StoreImplBase {
 					.asRuntimeException());
 		}
 	}
-	
+
+
 	@Override
 	public void copyOrder(CopyOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder salesOrder = ConvertUtil.convertOrder(
+			Order.Builder salesOrder = OrderConverUtil.convertOrder(
 				OrderManagement.createOrderFromOther(
 					request.getPosId(),
 					request.getSalesRepresentativeId(),
@@ -1395,22 +1896,32 @@ public class PointOfSalesForm extends StoreImplBase {
 			);
 		}
 	}
-	
+
+
 	@Override
 	public void createOrderFromRMA(CreateOrderFromRMARequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder salesOrder = ConvertUtil.convertOrder(OrderManagement.createOrderFromRMA(request.getPosId(), request.getSalesRepresentativeId(), request.getSourceRmaId()));
+			Order.Builder salesOrder = OrderConverUtil.convertOrder(
+				OrderManagement.createOrderFromRMA(
+					request.getPosId(),
+					request.getSalesRepresentativeId(),
+					request.getSourceRmaId()
+				)
+			);
 			responseObserver.onNext(salesOrder.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
 			log.severe(e.getLocalizedMessage());
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
-	
+
+
 	@Override
 	public void listCustomerCredits(ListCustomerCreditsRequest request, StreamObserver<ListCustomerCreditsResponse> responseObserver) {
 		try {
@@ -1453,8 +1964,10 @@ public class PointOfSalesForm extends StoreImplBase {
 		int count = 0;
 		try {
 			//	Get Bank statement
-			StringBuffer sql = new StringBuffer("SELECT i.C_Invoice_ID, i.DocumentNo, i.Description, i.DateInvoiced, i.C_Currency_ID, i.GrandTotal, (InvoiceOpen(i.C_Invoice_ID, null) * -1) AS OpenAmount ")
-					.append("FROM C_Invoice i ")
+			StringBuffer sql = new StringBuffer("SELECT i.C_Invoice_ID, i.DocumentNo, i.Description, i.DateInvoiced, i.C_Currency_ID, ")
+					.append("i.GrandTotal, (InvoiceOpen(i.C_Invoice_ID, null) * -1) AS OpenAmount, ")
+					.append("i.IsProcessed, i.IsProcessing ")
+					.append("FROM C_Invoice AS i ")
 					.append("WHERE i.IsSOTrx = 'Y' ")
 					.append("AND i.DocStatus IN('CO', 'CL') ")
 					.append("AND i.IsPaid = 'N' ")
@@ -1502,12 +2015,12 @@ public class PointOfSalesForm extends StoreImplBase {
 				CreditMemo.Builder creditMemo = CreditMemo.newBuilder()
 					.setId(rs.getInt("C_Invoice_ID"))
 					.setDocumentNo(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							rs.getString("DocumentNo")
 						)
 					)
 					.setDescription(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							rs.getString("Description")
 						)
 					)
@@ -1531,6 +2044,16 @@ public class PointOfSalesForm extends StoreImplBase {
 							rs.getBigDecimal("OpenAmount")
 						)
 					)
+					.setIsProcessed(
+						rs.getBoolean(
+							I_C_Invoice.COLUMNNAME_Processed
+						)
+					)
+					.setIsProcessing(
+						rs.getBoolean(
+							I_C_Invoice.COLUMNNAME_Processing
+						)
+					)
 				;
 				//	
 				builder.addRecords(creditMemo.build());
@@ -1549,7 +2072,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -1597,7 +2120,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -1707,7 +2230,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(request.getPosId() <= 0) {
 			throw new AdempiereException("@C_POS_ID@ @IsMandatory@");
 		}
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		MBankStatement cashClosing = CashManagement.getOpenCashClosing(pos, RecordUtil.getDate(), true, null);
 		if(cashClosing == null
 				|| cashClosing.getC_BankStatement_ID() <= 0) {
@@ -1762,7 +2285,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		//	Return
 		return builder;
@@ -1779,7 +2302,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(request.getPosId() <= 0) {
 			throw new AdempiereException("@C_POS_ID@ @IsMandatory@");
 		}
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		MBankStatement cashClosing = CashManagement.getOpenCashClosing(pos, RecordUtil.getDate(), true, null);
 		if(cashClosing == null
 				|| cashClosing.getC_BankStatement_ID() <= 0) {
@@ -1801,7 +2324,7 @@ public class PointOfSalesForm extends StoreImplBase {
 					+ "WHERE p.DocStatus IN('CO', 'CL') "
 					+ "AND p.C_POS_ID = ? "
 					+ "AND EXISTS(SELECT 1 FROM C_BankStatementLine bsl WHERE bsl.C_Payment_ID = p.C_Payment_ID AND bsl.C_BankStatement_ID = ?) "
-					+ "GROUP BY pm.UUID, pm.Name, pm.TenderType, p.C_Currency_ID, p.IsReceipt";
+					+ "GROUP BY pm.C_PaymentMethod_ID, pm.Name, pm.TenderType, p.C_Currency_ID, p.IsReceipt";
 			//	Count records
 			List<Object> parameters = new ArrayList<Object>();
 			parameters.add(pos.getC_POS_ID());
@@ -1814,14 +2337,16 @@ public class PointOfSalesForm extends StoreImplBase {
 			rs = pstmt.executeQuery();
 			while(rs.next()) {
 				PaymentSummary.Builder paymentSummary = PaymentSummary.newBuilder()
-					.setPaymentMethodId(rs.getInt("C_PaymentMethod_ID"))
+					.setPaymentMethodId(
+						rs.getInt("C_PaymentMethod_ID")
+					)
 					.setPaymentMethodName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							rs.getString("PaymentMethodName")
 						)
 					)
 					.setTenderTypeCode(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							rs.getString("TenderTypeCode")
 						)
 					)
@@ -1830,12 +2355,12 @@ public class PointOfSalesForm extends StoreImplBase {
 							rs.getInt("C_Currency_ID")
 						)
 					)
-					.setIsRefund(rs.getString("IsReceipt").equals("Y")? false: true)
-					.setAmount(
-						NumberManager.getBigDecimalToString(
-							rs.getBigDecimal("PaymentAmount")
+					.setIsRefund(
+						!BooleanManager.getBooleanFromString(
+							rs.getString("IsReceipt")
 						)
 					)
+					.setAmount(NumberManager.getBigDecimalToString(rs.getBigDecimal("PaymentAmount")))
 				;
 				//	
 				builder.addCashMovements(paymentSummary.build());
@@ -1854,7 +2379,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		//	Return
 		return builder;
@@ -1887,18 +2412,8 @@ public class PointOfSalesForm extends StoreImplBase {
 		AtomicReference<PO> refundReference = new AtomicReference<PO>();
 		Trx.run(transactionName -> {
 			GenericPO refundReferenceToCreate = new GenericPO("C_POSPaymentReference", Env.getCtx(), 0, transactionName);
-			refundReferenceToCreate.set_ValueOfColumn(
-				"Amount",
-				NumberManager.getBigDecimalFromString(
-					request.getAmount()
-				)
-			);
-			refundReferenceToCreate.set_ValueOfColumn(
-				"AmtSource",
-				NumberManager.getBigDecimalFromString(
-					request.getSourceAmount()
-				)
-			);
+			refundReferenceToCreate.set_ValueOfColumn("Amount", NumberManager.getBigDecimalFromString(request.getAmount()));
+			refundReferenceToCreate.set_ValueOfColumn("AmtSource", NumberManager.getBigDecimalFromString(request.getSourceAmount()));
 			if(request.getCustomerBankAccountId() > 0) {
 				refundReferenceToCreate.set_ValueOfColumn("C_BP_BankAccount_ID", request.getCustomerBankAccountId());
 			}
@@ -1907,7 +2422,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			if(currencyId > 0) {
 				refundReferenceToCreate.set_ValueOfColumn("C_Currency_ID", currencyId);
 			}
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			if(pos.get_ValueAsInt(I_C_ConversionType.COLUMNNAME_C_ConversionType_ID) > 0) {
 				refundReferenceToCreate.set_ValueOfColumn("C_ConversionType_ID", pos.get_ValueAsInt(I_C_ConversionType.COLUMNNAME_C_ConversionType_ID));
 			}
@@ -1934,28 +2449,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			refundReference.set(refundReferenceToCreate);
 		});
 
-		return PaymentConvertUtil.convertPaymentReference(
-			refundReference.get()
-		);
-	}
-
-
-	@Override
-	public void processCashOpening(CashOpeningRequest request, StreamObserver<Empty> responseObserver) {
-		try {
-			Empty.Builder empty = processCashOpening(request);
-			responseObserver.onNext(empty.build());
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
-			e.printStackTrace();
-			responseObserver.onError(
-				Status.INTERNAL
-					.withDescription(e.getLocalizedMessage())
-					.withCause(e)
-					.asRuntimeException()
-			);
-		}
+		return PaymentConvertUtil.convertPaymentReference(refundReference.get());
 	}
 
 	/**
@@ -1971,7 +2465,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			throw new AdempiereException("@CollectingAgent_ID@ @NotFound@");
 		}
 		Trx.run(transactionName -> {
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			//	
 			if(pos.getC_BankAccount_ID() <= 0) {
 				throw new AdempiereException("@C_BankAccount_ID@ @NotFound@");
@@ -1981,7 +2475,14 @@ public class PointOfSalesForm extends StoreImplBase {
 			if(defaultChargeId <= 0) {
 				throw new AdempiereException("@DefaultOpeningCharge_ID@ @NotFound@");
 			}
-
+			//	TODO: Implement it
+//			request.getPaymentsList().forEach(paymentRequest -> {
+//				MPayment payment = CashManagement.createPaymentFromCharge(cashAccount.get_ValueAsInt("DefaultOpeningCharge_ID"), paymentRequest, pos, transactionName);
+//				//	Add bank statement
+//				CashManagement.createCashClosing(pos, payment);
+//				//	
+//				CashManagement.processPayment(pos, payment, transactionName);
+//			});
 			final String whereClause = "C_POS_ID = ? AND C_Charge_ID = ? AND DocStatus = ?";
 			List<Integer> paymentsIdList = new Query(
 				Env.getCtx(),
@@ -2063,16 +2564,18 @@ public class PointOfSalesForm extends StoreImplBase {
 				throw new AdempiereException(bankStatement.getProcessMsg());
 			}
 			bankStatement.saveEx(transactionName);
-	        //	Set
-	        cashClosing
-				.setId(bankStatement.getC_BankStatement_ID())
+			//	Set
+			cashClosing
+				.setId(
+					bankStatement.getC_BankStatement_ID()
+				)
 				.setDocumentNo(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						bankStatement.getDocumentNo()
 					)
 				)
 				.setDescription(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						bankStatement.getDescription()
 					)
 				)
@@ -2093,32 +2596,13 @@ public class PointOfSalesForm extends StoreImplBase {
 		return cashClosing;
 	}
 
-
-	@Override
-	public void processCashWithdrawal(CashWithdrawalRequest request, StreamObserver<Empty> responseObserver) {
-		try {
-			Empty.Builder empty = processCashWithdrawal(request);
-			responseObserver.onNext(empty.build());
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
-			e.printStackTrace();
-			responseObserver.onError(
-				Status.INTERNAL
-					.withDescription(e.getLocalizedMessage())
-					.withCause(e)
-					.asRuntimeException()
-			);
-		}
-	}
-
 	/**
 	 * Withdrawal
 	 * @param request
 	 * @return
 	 */
 	private Empty.Builder processCashWithdrawal(CashWithdrawalRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		if(request.getCollectingAgentId() <= 0) {
 			throw new AdempiereException("@CollectingAgent_ID@ @NotFound@");
 		}
@@ -2131,7 +2615,11 @@ public class PointOfSalesForm extends StoreImplBase {
 			if(defaultChargeId <= 0) {
 				throw new AdempiereException("@DefaultWithdrawalCharge_ID@ @NotFound@");
 			}
-
+			//	TODO: Implement it
+//			request.getPaymentsList().forEach(paymentRequest -> {
+//				MPayment payment = CashManagement.createPaymentFromCharge(cashAccount.get_ValueAsInt("DefaultWithdrawalCharge_ID"), paymentRequest, pos, transactionName);
+//				CashManagement.processPayment(pos, payment, transactionName);
+//			});
 			final String whereClause = "C_POS_ID = ? AND C_Charge_ID = ? AND DocStatus = ?";
 			List<Integer> paymentsIdList = new Query(
 				Env.getCtx(),
@@ -2172,7 +2660,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(request.getPosId() <= 0) {
 			throw new AdempiereException("@FillMandatory@ @C_POS_ID@");
 		}
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		if (pos == null || pos.getC_POS_ID() <= 0) {
 			throw new AdempiereException("@C_POS_ID@ @NotFound@");
 		}
@@ -2182,7 +2670,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		}
 		MOrder returnOrder = ReverseSalesTransaction.returnCompleteOrder(pos, orderId, request.getDescription());
 		//	Default
-		return ConvertUtil.convertOrder(returnOrder);
+		return OrderConverUtil.convertOrder(returnOrder);
 	}
 
 	/**
@@ -2265,11 +2753,11 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
-	
+
 	/**
 	 * List shipment Lines from Order UUID
 	 * @param request
@@ -2286,8 +2774,10 @@ public class PointOfSalesForm extends StoreImplBase {
 		int offset = (pageNumber - 1) * limit;
 
 		int shipmentId = request.getShipmentId();
+		String whereClause = I_M_InOutLine.COLUMNNAME_M_InOut_ID + " = ? AND " +
+				I_M_InOutLine.COLUMNNAME_M_Product_ID + " > 0";
 		//	Get Product list
-		Query query = new Query(Env.getCtx(), I_M_InOutLine.Table_Name, I_M_InOutLine.COLUMNNAME_M_InOut_ID + " = ?", null)
+		Query query = new Query(Env.getCtx(), I_M_InOutLine.Table_Name, whereClause, null)
 				.setParameters(shipmentId)
 				.setClient_ID()
 				.setOnlyActiveRecords(true);
@@ -2306,7 +2796,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -2364,7 +2854,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -2406,48 +2896,66 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private ShipmentLine.Builder createAndConvertShipmentLine(CreateShipmentLineRequest request) {
+
 		//	Validate Order
 		if(request.getShipmentId() <= 0) {
-			throw new AdempiereException("@M_InOut_ID@ @NotFound@");
+			throw new AdempiereException("@FillMandatory@ @M_InOut_ID@");
 		}
 		//	Validate Product and charge
 		if(request.getOrderLineId() <= 0) {
-			throw new AdempiereException("@C_OrderLine_ID@ @NotFound@");
+			throw new AdempiereException("@FillMandatory@ @C_OrderLine_ID@");
 		}
-		int shipmentId = request.getShipmentId();
-		int salesOrderLineId = request.getOrderLineId();
-		if(shipmentId <= 0) {
-			return ShipmentLine.newBuilder();
+
+		MInOut shipmentHeader = new MInOut(Env.getCtx(), request.getShipmentId(), null);
+		if (shipmentHeader == null || shipmentHeader.getM_InOut_ID() <= 0) {
+			throw new AdempiereException("@M_InOut_ID@ @NotFound@");
 		}
-		if(salesOrderLineId <= 0) {
-			throw new AdempiereException("@C_OrderLine_ID@ @NotFound@");
-		}
-		MInOut shipmentHeader = new MInOut(Env.getCtx(), shipmentId, null);
 		if(!DocumentUtil.isDrafted(shipmentHeader)) {
 			throw new AdempiereException("@M_InOut_ID@ @Processed@");
 		}
 		//	Quantity
-		MOrderLine salesOrderLine = new MOrderLine(Env.getCtx(), salesOrderLineId, null);
+		MOrderLine salesOrderLine = new MOrderLine(Env.getCtx(), request.getOrderLineId(), null);
+		if (salesOrderLine == null || salesOrderLine.getC_OrderLine_ID() <= 0) {
+			throw new AdempiereException("@C_OrderLine_ID@ @NotFound@");
+		}
 		Optional<MInOutLine> maybeOrderLine = Arrays.asList(shipmentHeader.getLines(true))
 			.parallelStream()
-			.filter(shipmentLineTofind -> shipmentLineTofind.getC_OrderLine_ID() == salesOrderLine.getC_OrderLine_ID())
+			.filter(shipmentLineTofind -> {
+				return shipmentLineTofind.getC_OrderLine_ID() == salesOrderLine.getC_OrderLine_ID();
+			})
 			.findFirst()
 		;
 		AtomicReference<MInOutLine> shipmentLineReference = new AtomicReference<MInOutLine>();
 		BigDecimal quantity = NumberManager.getBigDecimalFromString(
 			request.getQuantity()
 		);
+
 		//	Validate available
 		if(salesOrderLine.getQtyOrdered().subtract(salesOrderLine.getQtyDelivered()).compareTo(Optional.ofNullable(quantity).orElse(Env.ONE)) < 0) {
 			throw new AdempiereException("@QtyInsufficient@");
 		}
 		if(maybeOrderLine.isPresent()) {
 			MInOutLine shipmentLine = maybeOrderLine.get();
+			if(shipmentLine.isProcessed()) {
+				throw new AdempiereException("@M_InOutLine_ID@ @Processed@");
+			}
+			BigDecimal availableQuantity = ShipmentUtil.getAvailableQuantityForShipment(
+				salesOrderLine.getC_OrderLine_ID(),
+				shipmentLine.getM_InOutLine_ID(),
+				salesOrderLine.getQtyEntered(),
+				quantity
+			);
+			if (availableQuantity.compareTo(Env.ZERO) <= 0) {
+				throw new AdempiereException("@QtyInsufficient@");
+			}
 			//	Set Quantity
 			BigDecimal quantityToOrder = quantity;
 			if(quantity == null) {
 				quantityToOrder = shipmentLine.getQtyEntered();
 				quantityToOrder = quantityToOrder.add(Env.ONE);
+			}
+			if (availableQuantity.compareTo(quantityToOrder) < 0) {
+				throw new AdempiereException("@QtyInsufficient@");
 			}
 			//	Validate available
 			if(salesOrderLine.getQtyOrdered().subtract(salesOrderLine.getQtyDelivered()).compareTo(quantityToOrder) < 0) {
@@ -2459,11 +2967,23 @@ public class PointOfSalesForm extends StoreImplBase {
 			shipmentLineReference.set(shipmentLine);
 		} else {
 			MInOutLine shipmentLine = new MInOutLine(shipmentHeader);
+			BigDecimal availableQuantity = ShipmentUtil.getAvailableQuantityForShipment(
+				salesOrderLine.getC_OrderLine_ID(),
+				shipmentLine.getM_InOutLine_ID(),
+				salesOrderLine.getQtyEntered(),
+				quantity
+			);
+			if (availableQuantity.compareTo(Env.ZERO) <= 0) {
+				throw new AdempiereException("@QtyInsufficient@");
+			}
 			BigDecimal quantityToOrder = quantity;
-			if(quantity == null) {
+			if (quantity == null) {
 				quantityToOrder = Env.ONE;
 			}
-	        //create new line
+			if (availableQuantity.compareTo(quantityToOrder) < 0) {
+				throw new AdempiereException("@QtyInsufficient@");
+			}
+			//create new line
 			shipmentLine.setOrderLine(salesOrderLine, 0, quantityToOrder);
 			Optional.ofNullable(request.getDescription()).ifPresent(description -> shipmentLine.setDescription(description));
 			//	Update movement quantity
@@ -2477,7 +2997,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			shipmentLineReference.get()
 		);
 	}
-	
+
 	/**
 	 * Create  from request
 	 * @param context
@@ -2547,6 +3067,9 @@ public class PointOfSalesForm extends StoreImplBase {
 		orderLines.forEach(salesOrderLine -> {
 			if(!DocumentUtil.isDrafted(shipmentHeader)) {
 				throw new AdempiereException("@M_InOut_ID@ @Processed@");
+			}
+			if (salesOrderLine.getM_Product_ID() == 0) {
+				return;
 			}
 			//	Quantity
 			Optional<MInOutLine> maybeOrderLine = Arrays.asList(shipmentHeader.getLines(true))
@@ -2625,14 +3148,34 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(Util.isEmpty(request.getName(), true)) {
 			throw new AdempiereException("@Name@ @IsMandatory@");
 		}
+		final int clientId = Env.getAD_Client_ID(Env.getCtx());
 		//	POS Uuid
-		MPOS pos = getPOSFromId(request.getPosId(), true);
-		MBPartner businessPartner = MBPartner.getTemplate(context, Env.getAD_Client_ID(Env.getCtx()), pos.getC_POS_ID());
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
+		MBPartner businessPartner = MBPartner.getTemplate(context, clientId, pos.getC_POS_ID());
+
 		//	Validate Template
-		if(pos.getC_BPartnerCashTrx_ID() <= 0) {
+		int customerTemplateId = request.getCustomerTemplateId();
+		if (customerTemplateId <= 0) {
+			customerTemplateId = pos.getC_BPartnerCashTrx_ID();
+		}
+		if(customerTemplateId <= 0) {
+			throw new AdempiereException("@FillMandatory@ @C_BPartnerCashTrx_ID@");
+		}
+		MBPartner template = MBPartner.get(context, customerTemplateId);
+		if (template == null || template.getC_BPartner_ID() <= 0) {
 			throw new AdempiereException("@C_BPartnerCashTrx_ID@ @NotFound@");
 		}
-		MBPartner template = MBPartner.get(context, pos.getC_BPartnerCashTrx_ID());
+
+		// copy and clear values by termplate
+		PO.copyValues(template, businessPartner);
+		businessPartner.setTaxID("");
+		businessPartner.setValue("");
+		businessPartner.setNAICS(null);
+		businessPartner.setName("");
+		businessPartner.setName2(null);
+		businessPartner.setDUNS("");
+		businessPartner.setIsActive(true);
+
 		Optional<MBPartnerLocation> maybeTemplateLocation = Arrays.asList(template.getLocations(false))
 			.stream()
 			.findFirst()
@@ -2654,13 +3197,10 @@ public class PointOfSalesForm extends StoreImplBase {
 			businessPartner.set_TrxName(transactionName);
 			//	Set Value
 			String code = request.getValue();
-			if(Util.isEmpty(code)) {
-				code = DB.getDocumentNo(Env.getAD_Client_ID(Env.getCtx()), "C_BPartner", transactionName, businessPartner);
+			if(Util.isEmpty(code, true)) {
+				code = DB.getDocumentNo(clientId, I_C_BPartner.Table_Name, transactionName, businessPartner);
 			}
-			//	
 			businessPartner.setValue(code);
-			//	Set Value
-			Optional.ofNullable(request.getValue()).ifPresent(value -> businessPartner.setValue(value));
 			//	Tax Id
 			Optional.ofNullable(request.getTaxId()).ifPresent(value -> businessPartner.setTaxID(value));
 			//	Duns
@@ -2846,7 +3386,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private Customer.Builder updateCustomer(UpdateCustomerRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		if(!getBooleanValueFromPOS(pos, Env.getAD_User_ID(Env.getCtx()), "IsAllowsModifyCustomer")) {
 			throw new AdempiereException("@POS.ModifyCustomerNotAllowed@");
 		}
@@ -2964,7 +3504,8 @@ public class PointOfSalesForm extends StoreImplBase {
 							contact.setC_BPartner_Location_ID(businessPartnerLocation.getC_BPartner_Location_ID());
 							contact.saveEx(transactionName);
 				 		}
-					} else {	//	Create new
+					} else {
+						//	Create new
 						Optional<MBPartnerLocation> maybeTemplateLocation = Arrays.asList(businessPartner.getLocations(false)).stream().findFirst();
 						if(!maybeTemplateLocation.isPresent()) {
 							throw new AdempiereException("@C_BPartnerCashTrx_ID@ @C_BPartner_Location_ID@ @NotFound@");
@@ -3035,14 +3576,16 @@ public class PointOfSalesForm extends StoreImplBase {
 			MWarehouse warehouse = MWarehouse.get(Env.getCtx(), availableWarehouse.get_ValueAsInt("M_Warehouse_ID"));
 			builder.addWarehouses(
 				AvailableWarehouse.newBuilder()
-					.setId(warehouse.getM_Warehouse_ID())
+					.setId(
+						warehouse.getM_Warehouse_ID()
+					)
 					.setKey(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							warehouse.getValue()
 						)
 					)
 					.setName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							warehouse.getName()
 						)
 					)
@@ -3058,7 +3601,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3099,14 +3642,16 @@ public class PointOfSalesForm extends StoreImplBase {
 			MPriceList priceList = MPriceList.get(Env.getCtx(), availablePriceList.get_ValueAsInt("M_PriceList_ID"), null);
 			builder.addPriceList(
 				AvailablePriceList.newBuilder()
-					.setId(priceList.getM_PriceList_ID())
+					.setId(
+						priceList.getM_PriceList_ID()
+					)
 					.setKey(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							priceList.getName()
 						)
 					)
 					.setName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							priceList.getName()
 						)
 					)
@@ -3122,7 +3667,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3143,90 +3688,40 @@ public class PointOfSalesForm extends StoreImplBase {
 		}
 		final String PAYMENT_METHOD_TABLE_NAME = "C_PaymentMethod";
 		MTable paymentTypeTable = MTable.get(Env.getCtx(), PAYMENT_METHOD_TABLE_NAME);
-		if(paymentTypeTable == null
-				|| paymentTypeTable.getAD_Table_ID() <= 0) {
+		if (paymentTypeTable == null || paymentTypeTable.getAD_Table_ID() <= 0) {
 			return builder;
 		}
-		String nexPageToken = null;
-		int pageNumber = LimitUtil.getPageNumber(SessionManager.getSessionUuid(), request.getPageToken());
-		int limit = LimitUtil.getPageSize(request.getPageSize());
-		int offset = (pageNumber - 1) * limit;
 
 		//	Dynamic where clause
 		//	Aisle Seller
 		int posId = request.getPosId();
 		//	Get Product list
 		Query query = new Query(
-				Env.getCtx(),
-				TABLE_NAME,
-				" C_POS_ID = ? AND IsDisplayedFromCollection = 'Y' ",
-				null
-			)
-				.setParameters(posId)
-				.setOnlyActiveRecords(true)
-				.setOrderBy(I_AD_PrintFormatItem.COLUMNNAME_SeqNo);
-		int count = query.count();
-		query
-		.setLimit(limit, offset)
-		.list()
-		.forEach(availablePaymentMethod -> {
-			MCPaymentMethod paymentMethod = (MCPaymentMethod) paymentTypeTable.getPO(availablePaymentMethod.get_ValueAsInt("C_PaymentMethod_ID"), null);
-			PaymentMethod.Builder paymentMethodBuilder = PaymentConvertUtil.convertPaymentMethod(
-				paymentMethod
-			);
+			Env.getCtx(),
+			TABLE_NAME,
+			" C_POS_ID = ? AND IsDisplayedFromCollection = 'Y' ",
+			null
+		)
+			.setParameters(posId)
+			.setOnlyActiveRecords(true)
+			.setOrderBy(I_AD_PrintFormatItem.COLUMNNAME_SeqNo)
+		;
 
-			AvailablePaymentMethod.Builder tenderTypeValue = AvailablePaymentMethod.newBuilder()
-				.setId(availablePaymentMethod.get_ID())
-				.setName(
-					Util.isEmpty(availablePaymentMethod.get_ValueAsString(I_AD_Ref_List.COLUMNNAME_Name)) ?
-						ValueManager.validateNull(paymentMethod.getName()) :
-						ValueManager.validateNull(availablePaymentMethod.get_ValueAsString(I_AD_Ref_List.COLUMNNAME_Name))
-				)
-				.setPosId(request.getPosId())
-				.setIsPosRequiredPin(
-					availablePaymentMethod.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN)
-				)
-				.setIsAllowedToRefund(
-					availablePaymentMethod.get_ValueAsBoolean("IsAllowedToRefund")
-				)
-				.setIsAllowedToRefundOpen(
-					availablePaymentMethod.get_ValueAsBoolean("IsAllowedToRefundOpen")
-				)
-				.setMaximumRefundAllowed(
-					NumberManager.getBigDecimalToString(
-						(BigDecimal) availablePaymentMethod.get_Value("MaximumRefundAllowed")
-					)
-				)
-				.setMaximumDailyRefundAllowed(
-					NumberManager.getBigDecimalToString(
-						(BigDecimal) availablePaymentMethod.get_Value("MaximumDailyRefundAllowed")
-					)
-				)
-				.setIsPaymentReference(
-					availablePaymentMethod.get_ValueAsBoolean("IsPaymentReference")
-				)
-				.setDocumentTypeId(
-					availablePaymentMethod.get_ValueAsInt("C_DocTypeCreditMemo_ID")
-				)
-				.setPaymentMethod(paymentMethodBuilder)
-			;
-			if(availablePaymentMethod.get_ValueAsInt("RefundReferenceCurrency_ID") > 0) {
-				tenderTypeValue.setRefundReferenceCurrency(
-					CoreFunctionalityConvert.convertCurrency(
-						availablePaymentMethod.get_ValueAsInt("RefundReferenceCurrency_ID")
-					)
-				);
-			}
-			if(availablePaymentMethod.get_ValueAsInt("ReferenceCurrency_ID") > 0) {
-				tenderTypeValue.setReferenceCurrency(
-					CoreFunctionalityConvert.convertCurrency(
-						availablePaymentMethod.get_ValueAsInt("ReferenceCurrency_ID")
-					)
-				);
-			}
-			builder.addPaymentMethods(tenderTypeValue);
-			//	
-		});
+		// Pagination
+		int count = query.count();
+		String nexPageToken = null;
+		int pageNumber = LimitUtil.getPageNumber(SessionManager.getSessionUuid(), request.getPageToken());
+		int limit = LimitUtil.getPageSize(request.getPageSize());
+		int offset = (pageNumber - 1) * limit;
+
+		query
+			.setLimit(limit, offset)
+			.list()
+			.forEach(availablePaymentMethod -> {
+				AvailablePaymentMethod.Builder tenderTypeValue = POSConvertUtil.convertPaymentMethod(availablePaymentMethod);
+				builder.addPaymentMethods(tenderTypeValue);
+			})
+		;
 		//	
 		builder.setRecordCount(count);
 		//	Set page token
@@ -3234,7 +3729,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3274,18 +3769,23 @@ public class PointOfSalesForm extends StoreImplBase {
 		.forEach(availableDocumentType -> {
 			MDocType documentType = MDocType.get(Env.getCtx(), availableDocumentType.get_ValueAsInt("C_DocType_ID"));
 			builder.addDocumentTypes(AvailableDocumentType.newBuilder()
-				.setId(documentType.getC_DocType_ID())
+				.setId(
+					documentType.getC_DocType_ID()
+				)
 				.setKey(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						documentType.getName()
 					)
 				)
 				.setName(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						documentType.getPrintName()
 					)
 				)
-				.setIsPosRequiredPin(availableDocumentType.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN)));
+				.setIsPosRequiredPin(
+					availableDocumentType.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN)
+				)
+			);
 		});
 		//	
 		builder.setRecordCount(count);
@@ -3294,7 +3794,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3305,7 +3805,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private ListAvailableCurrenciesResponse.Builder listCurrencies(ListAvailableCurrenciesRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		ListAvailableCurrenciesResponse.Builder builder = ListAvailableCurrenciesResponse.newBuilder();
 		String nexPageToken = null;
 		int pageNumber = LimitUtil.getPageNumber(SessionManager.getSessionUuid(), request.getPageToken());
@@ -3336,7 +3836,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3347,7 +3847,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private MOrder processOrder(ProcessOrderRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		return OrderManagement.processOrder(
 			pos,
 			request.getId(),
@@ -3448,7 +3948,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		}
 
 		//	Dynamic where clause
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		int posId = pos.getC_POS_ID();
 		int salesRepresentativeId = request.getSalesRepresentativeId();
 		int orgId = pos.getAD_Org_ID();
@@ -3490,9 +3990,20 @@ public class PointOfSalesForm extends StoreImplBase {
 			}
 		}
 		//	Document No
-		if(!Util.isEmpty(request.getDocumentNo())) {
+		if(!Util.isEmpty(request.getDocumentNo(), true)) {
 			whereClause.append(" AND UPPER(DocumentNo) LIKE '%' || UPPER(?) || '%'");
 			parameters.add(request.getDocumentNo());
+		}
+		//	Invoice Document No
+		if(!Util.isEmpty(request.getInvoiceNo(), true)) {
+			whereClause.append(" AND EXISTS(")
+				.append("SELECT 1 ")
+				.append("FROM C_Invoice AS i ")
+				.append("WHERE i.C_Order_ID = C_Order.C_Order_ID ")
+				.append("AND UPPER(i.DocumentNo) LIKE '%' || UPPER(?) || '%' ")
+				.append(") ")
+			;
+			parameters.add(request.getInvoiceNo());
 		}
 		//	Business Partner
 		if(request.getBusinessPartnerId() > 0) {
@@ -3513,9 +4024,8 @@ public class PointOfSalesForm extends StoreImplBase {
 		BigDecimal openAmount = NumberManager.getBigDecimalFromString(
 			request.getOpenAmount()
 		);
-		if(openAmount != null
-				&& !openAmount.equals(Env.ZERO)) {
-			whereClause.append(" (EXISTS(SELECT 1 FROM C_Invoice i WHERE i.C_Order_ID = C_Order.C_Order_ID GROUP BY i.C_Order_ID HAVING(SUM(invoiceopen(i.C_Invoice_ID, 0)) = ?))"
+		if(openAmount != null && !openAmount.equals(Env.ZERO)) {
+			whereClause.append(" AND (EXISTS(SELECT 1 FROM C_Invoice i WHERE i.C_Order_ID = C_Order.C_Order_ID GROUP BY i.C_Order_ID HAVING(SUM(invoiceopen(i.C_Invoice_ID, 0)) = ?))"
 					+ " OR EXISTS(SELECT 1 FROM C_Payment p WHERE C_Order_ID = C_Order.C_Order_ID GROUP BY p.C_Order_ID HAVING(SUM(p.PayAmt) = ?)"
 					+ ")");
 			parameters.add(openAmount);
@@ -3615,14 +4125,14 @@ public class PointOfSalesForm extends StoreImplBase {
 		ListOrdersResponse.Builder builder = ListOrdersResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
 		query.setLimit(limit, offset)
 			.getIDsAsList()
 			.forEach(orderId -> {
-				Order.Builder orderBuilder = POSConvertUtil.convertOder(orderId);
+				Order.Builder orderBuilder = OrderConverUtil.convertOder(orderId);
 				builder.addOrders(orderBuilder);
 			});
 
@@ -3694,7 +4204,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3735,7 +4245,11 @@ public class PointOfSalesForm extends StoreImplBase {
 		.setOrderBy(I_C_OrderLine.COLUMNNAME_Line)
 		.<MOrderLine>list()
 		.forEach(orderLine -> {
-			builder.addOrderLines(ConvertUtil.convertOrderLine(orderLine));
+			builder.addOrderLines(
+				OrderConverUtil.convertOrderLine(
+					orderLine
+				)
+			);
 		});
 		//	
 		builder.setRecordCount(count);
@@ -3744,7 +4258,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -3800,7 +4314,9 @@ public class PointOfSalesForm extends StoreImplBase {
 	@Override
 	public void updateOrder(UpdateOrderRequest request, StreamObserver<Order> responseObserver) {
 		try {
-			Order.Builder order = ConvertUtil.convertOrder(updateOrder(request));
+			Order.Builder order = OrderConverUtil.convertOrder(
+				updateOrder(request)
+			);
 			responseObserver.onNext(order.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
@@ -3903,6 +4419,14 @@ public class PointOfSalesForm extends StoreImplBase {
 			BigDecimal discountAmountOff = NumberManager.getBigDecimalFromString(
 				request.getDiscountAmountOff()
 			);
+			if (request.getDiscountSchemaId() > 0) {
+				MDiscountSchema discountSchema = MDiscountSchema.get(
+					Env.getCtx(),
+					request.getDiscountSchemaId()
+				);
+				// discountRateOff = discountSchema.getFlatDiscount();
+				configureDiscount(salesOrder, discountSchema.getFlatDiscount(), transactionName);
+			}
 			if(discountRateOff != null) {
 				configureDiscountRateOff(salesOrder, discountRateOff, transactionName);
 			} else if(discountAmountOff != null) {
@@ -3916,8 +4440,10 @@ public class PointOfSalesForm extends StoreImplBase {
 
 			//	Save
 			salesOrder.saveEx(transactionName);
+			salesOrder.load(transactionName);
 			orderReference.set(salesOrder);
 		});
+
 		//	Return order
 		return orderReference.get();
 	}
@@ -4022,24 +4548,30 @@ public class PointOfSalesForm extends StoreImplBase {
 			orderLine.saveEx();
 		});
 	}
-	
+
 	/**
 	 * Configure Discount for all lines
 	 * @param order
 	 */
 	private void configureDiscount(MOrder order, BigDecimal discountRate, String transactionName) {
+		MPOS pos = POS.validateAndGetPOS(order.getC_POS_ID(), false);
 		Arrays.asList(order.getLines())
-		.forEach(orderLine -> {
-			BigDecimal discountAmount = orderLine.getPriceList().multiply(Optional.ofNullable(discountRate).orElse(Env.ZERO).divide(Env.ONEHUNDRED));
-			BigDecimal price = orderLine.getPriceList().subtract(discountAmount);
-			//	Set values
-			orderLine.setPrice(price); 
-			//	sets List/limit
-			orderLine.setTax();
-			orderLine.saveEx(transactionName);
-		});
+			.forEach(orderLine -> {
+				updateOrderLine(
+					transactionName,
+					pos,
+					orderLine.getC_OrderLine_ID(),
+					null,
+					null,
+					discountRate,
+					false,
+					0,
+					0
+				);
+			})
+		;
 	}
-	
+
 	/**
 	 * Configure Discount Off for order
 	 * @param order
@@ -4182,11 +4714,13 @@ public class PointOfSalesForm extends StoreImplBase {
 			discountOrderLine = maybeOrderLine.get();
 			discountOrderLine.setQty(Env.ONE);
 			discountOrderLine.setPrice(amount.negate());
+			discountOrderLine.setM_AttributeSetInstance_ID(0);
 		} else {
 			discountOrderLine = new MOrderLine(order);
 			discountOrderLine.setQty(Env.ONE);
 			discountOrderLine.setC_Charge_ID(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DefaultDiscountCharge_ID));
 			discountOrderLine.setPrice(amount.negate());
+			discountOrderLine.setM_AttributeSetInstance_ID(0);
 		}
 		//	
 		discountOrderLine.saveEx(transactionName);
@@ -4441,16 +4975,23 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private Empty.Builder deletePayment(DeletePaymentRequest request) {
-		int paymentId = request.getId();
-		if(paymentId <= 0) {
-			throw new AdempiereException("@C_Payment_ID@ @NotFound@");
+		final int paymentId = request.getId();
+		if (request.getId() <= 0) {
+			throw new AdempiereException("@FillMandatory@ @C_Payment_ID@");
 		}
-		MPayment payment = new Query(Env.getCtx(), I_C_Payment.Table_Name, I_C_Payment.COLUMNNAME_C_Payment_ID + " = ?", null)
-				.setParameters(paymentId)
-				.setClient_ID()
-				.first();
+		MPayment payment = new Query(
+			Env.getCtx(),
+			I_C_Payment.Table_Name,
+			I_C_Payment.COLUMNNAME_C_Payment_ID + " = ?",
+			null
+		)
+			.setParameters(paymentId)
+			.setClient_ID()
+			.first()
+		;
 		if(payment == null
 				|| payment.getC_Payment_ID() == 0) {
+			// throw new AdempiereException("@C_Payment_ID@ @NotFound@");
 			return Empty.newBuilder();
 		}
 		//	Validate drafted
@@ -4485,28 +5026,29 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(orderLineId <= 0) {
 			throw new AdempiereException("@C_OrderLine_ID@ @NotFound@");
 		}
-		MPOS pos = getPOSFromId(request.getPosId(), true);
-		//	Quantity
-		return ConvertUtil.convertOrderLine(
-			updateOrderLine(
+
+		AtomicReference<MOrderLine> maybeOrderLine = new AtomicReference<MOrderLine>();
+		Trx.run(transactionName -> {
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
+			//	Quantity
+			MOrderLine orderLine = updateOrderLine(
+				transactionName,
 				pos,
 				orderLineId,
-				NumberManager.getBigDecimalFromString(
-					request.getQuantity()
-				),
-				NumberManager.getBigDecimalFromString(
-					request.getPrice()
-				),
-				NumberManager.getBigDecimalFromString(
-					request.getDiscountRate()
-				),
+				NumberManager.getBigDecimalFromString(request.getQuantity()),
+				NumberManager.getBigDecimalFromString(request.getPrice()),
+				NumberManager.getBigDecimalFromString(request.getDiscountRate()),
 				request.getIsAddQuantity(),
 				request.getWarehouseId(),
 				request.getUomId()
-			)
+			);
+			maybeOrderLine.set(orderLine);
+		});
+		return OrderConverUtil.convertOrderLine(
+			maybeOrderLine.get()
 		);
 	}
-	
+
 	/**
 	 * Create order line and return this
 	 * @param request
@@ -4543,7 +5085,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			);
 		}
 		//	Quantity
-		return ConvertUtil.convertOrderLine(orderLine);
+		return OrderConverUtil.convertOrderLine(orderLine);
 	}
 	
 	private MOrderLine addOrderLineFromResourceAssigment(int orderId, int resourceAssignmentId, int warehouseId) {
@@ -4613,7 +5155,7 @@ public class PointOfSalesForm extends StoreImplBase {
 				orderLine.setPrice();
 				orderLine.setTax();
 				StringBuffer description = new StringBuffer(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						resourceAssigment.getName()
 					)
 				);
@@ -4656,16 +5198,21 @@ public class PointOfSalesForm extends StoreImplBase {
 				throw new AdempiereException("@C_Order_ID@ @Processed@");
 			}
 			OrderUtil.setCurrentDate(order);
-			// catch Exceptions at order.getLines()
-			Optional<MOrderLine> maybeOrderLine = Arrays.asList(order.getLines(true, "Line"))
-				.parallelStream()
-				.filter(orderLine -> (productId != 0 && productId == orderLine.getM_Product_ID()) 
-					|| (chargeId != 0 && chargeId == orderLine.getC_Charge_ID())
-				)
-				.findFirst()
-			;
-			if(maybeOrderLine.isPresent()) {
-				MOrderLine orderLine = maybeOrderLine.get();
+			StringBuffer whereClause = new StringBuffer(I_C_OrderLine.COLUMNNAME_C_Order_ID + " = ?");
+			List<Object> parameters = new ArrayList<>();
+			parameters.add(orderId);
+			if(productId > 0) {
+				whereClause.append(" AND M_Product_ID = ?");
+				parameters.add(productId);
+			} else if(chargeId > 0){
+				whereClause.append(" AND C_Charge_ID = ?");
+				parameters.add(chargeId);
+			}
+			MOrderLine orderLine = new Query(Env.getCtx(), I_C_OrderLine.Table_Name, whereClause.toString(), transactionName)
+					.setParameters(parameters)
+					.first();
+			if(orderLine != null
+					&& orderLine.getC_OrderLine_ID() > 0) {
 				//	Set Quantity
 				BigDecimal quantityToOrder = quantity;
 				if(quantity == null) {
@@ -4680,7 +5227,7 @@ public class PointOfSalesForm extends StoreImplBase {
 					quantityToOrder = Env.ONE;
 				}
 				//create new line
-				MOrderLine orderLine = new MOrderLine(order);
+				orderLine = new MOrderLine(order);
 				orderLine.setC_Campaign_ID(order.getC_Campaign_ID());
 				if(chargeId > 0) {
 					orderLine.setC_Charge_ID(chargeId);
@@ -4703,6 +5250,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	
 	/***
 	 * Update order line
+	 * @param transactionName
 	 * @param orderLineId
 	 * @param quantity
 	 * @param price
@@ -4711,86 +5259,84 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @param warehouseId
 	 * @return
 	 */
-	private MOrderLine updateOrderLine(MPOS pos, int orderLineId, BigDecimal quantity, BigDecimal price, BigDecimal discountRate, boolean isAddQuantity, int warehouseId, int unitOfMeasureId) {
+	private MOrderLine updateOrderLine(String transactionName, MPOS pos, int orderLineId, BigDecimal quantity, BigDecimal price, BigDecimal discountRate, boolean isAddQuantity, int warehouseId, int unitOfMeasureId) {
 		if(orderLineId <= 0) {
 			return null;
 		}
-		AtomicReference<MOrderLine> maybeOrderLine = new AtomicReference<MOrderLine>();
-		Trx.run(transactionName -> {
-			MOrderLine orderLine = new MOrderLine(Env.getCtx(), orderLineId, transactionName);
-			MOrder order = orderLine.getParent();
-			order.set_TrxName(transactionName);
-			OrderManagement.validateOrderReleased(order);
-			OrderUtil.setCurrentDate(order);
-			orderLine.setHeaderInfo(order);
-			//	Valid Complete
-			if (!DocumentUtil.isDrafted(order)) {
-				throw new AdempiereException("@C_Order_ID@ @Processed@");
+
+		MOrderLine orderLine = new MOrderLine(Env.getCtx(), orderLineId, transactionName);
+		MOrder order = orderLine.getParent();
+		order.set_TrxName(transactionName);
+		OrderManagement.validateOrderReleased(order);
+		OrderUtil.setCurrentDate(order);
+		orderLine.setHeaderInfo(order);
+		//	Valid Complete
+		if (!DocumentUtil.isDrafted(order)) {
+			throw new AdempiereException("@C_Order_ID@ @Processed@");
+		}
+		int precision = MPriceList.getPricePrecision(Env.getCtx(), order.getM_PriceList_ID());
+		BigDecimal quantityToChange = quantity;
+		//	Get if is null
+		if(quantity != null) {
+			if(isAddQuantity) {
+				BigDecimal currentQuantity = orderLine.getQtyEntered();
+				if(currentQuantity == null) {
+					currentQuantity = Env.ZERO;
+				}
+				quantityToChange = currentQuantity.add(quantityToChange);
 			}
-			int precision = MPriceList.getPricePrecision(Env.getCtx(), order.getM_PriceList_ID());
-			BigDecimal quantityToChange = quantity;
-			//	Get if is null
-			if(quantity != null) {
-				if(isAddQuantity) {
-					BigDecimal currentQuantity = orderLine.getQtyEntered();
-					if(currentQuantity == null) {
-						currentQuantity = Env.ZERO;
-					}
-					quantityToChange = currentQuantity.add(quantityToChange);
+			if(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID) > 0) {
+				// if(warehouseId != orderLine.get_ValueAsInt("Ref_WarehouseSource_ID")
+				// 		|| unitOfMeasureId != orderLine.getC_UOM_ID()) {
+				// 	throw new AdempiereException("@ActionNotAllowedHere@");
+				// }
+				MOrderLine sourceRmaLine = new MOrderLine(Env.getCtx(), orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID), transactionName);
+				BigDecimal availableQuantity = OrderUtil.getAvailableQuantityForSell(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID), orderLineId, sourceRmaLine.getQtyEntered(), quantityToChange);
+				if(availableQuantity.compareTo(Env.ZERO) > 0) {
+					//	Update order quantity
+					quantityToChange = availableQuantity;
+				} else {
+					throw new AdempiereException("@QtyInsufficient@");
 				}
-				if(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID) > 0) {
-//					if(warehouseId != orderLine.get_ValueAsInt("Ref_WarehouseSource_ID")
-//							|| unitOfMeasureId != orderLine.getC_UOM_ID()) {
-//						throw new AdempiereException("@ActionNotAllowedHere@");
-//					}
-					MOrderLine sourceRmaLine = new MOrderLine(Env.getCtx(), orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID), transactionName);
-					BigDecimal availableQuantity = OrderUtil.getAvailableQuantityForSell(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID), orderLineId, sourceRmaLine.getQtyEntered(), quantityToChange);
-					if(availableQuantity.compareTo(Env.ZERO) > 0) {
-						//	Update order quantity
-						quantityToChange = availableQuantity;
-					} else {
-						throw new AdempiereException("@QtyInsufficient@");
-					}
-				}
-				orderLine.setQty(quantityToChange);
 			}
-			//	Calculate discount from final price
-			if(price != null
-					|| discountRate != null) {
-				if(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID) > 0) {
-					throw new AdempiereException("@ActionNotAllowedHere@");
-				}
-				// TODO: Verify with Price Entered/Actual
-				BigDecimal priceToOrder = orderLine.getPriceActual();
-				BigDecimal discountRateToOrder = Env.ZERO;
-				if (price != null) {
-					priceToOrder = price;
-					discountRateToOrder = getDiscount(orderLine.getPriceList(), price, precision);
-				}
-				//	Calculate final price from discount
-				if (discountRate != null) {
-					discountRateToOrder = discountRate;
-					priceToOrder = getFinalPrice(orderLine.getPriceList(), discountRate, precision);
-					priceToOrder = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), orderLine.getC_UOM_ID(), priceToOrder);
-				}
-				orderLine.setDiscount(discountRateToOrder);
-				orderLine.setPrice(priceToOrder);
+			orderLine.setQty(quantityToChange);
+		}
+		//	Calculate discount from final price
+		if(price != null
+				|| discountRate != null) {
+			if(orderLine.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID) > 0) {
+				throw new AdempiereException("@ActionNotAllowedHere@");
 			}
-			//	
-			if(warehouseId > 0) {
-//				orderLine.setM_Warehouse_ID(warehouseId);
-				orderLine.set_ValueOfColumn("Ref_WarehouseSource_ID", warehouseId);
+			// TODO: Verify with Price Entered/Actual
+			BigDecimal priceToOrder = orderLine.getPriceActual();
+			BigDecimal discountRateToOrder = Env.ZERO;
+			if (price != null) {
+				priceToOrder = price;
+				discountRateToOrder = getDiscount(orderLine.getPriceList(), price, precision);
 			}
-			//	Validate UOM
-			OrderUtil.updateUomAndQuantity(orderLine, unitOfMeasureId, quantityToChange);
-			//	Set values
-			orderLine.setTax();
-			orderLine.saveEx(transactionName);
-			//	Apply Discount from order
-			configureDiscountRateOff(order, (BigDecimal) order.get_Value("FlatDiscount"), transactionName);
-			maybeOrderLine.set(orderLine);
-		});
-		return maybeOrderLine.get();
+			//	Calculate final price from discount
+			if (discountRate != null) {
+				discountRateToOrder = discountRate;
+				priceToOrder = getFinalPrice(orderLine.getPriceList(), discountRate, precision);
+				priceToOrder = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), orderLine.getC_UOM_ID(), priceToOrder);
+			}
+			orderLine.setDiscount(discountRateToOrder);
+			orderLine.setPrice(priceToOrder);
+		}
+		//	
+		if(warehouseId > 0) {
+			// orderLine.setM_Warehouse_ID(warehouseId);
+			orderLine.set_ValueOfColumn("Ref_WarehouseSource_ID", warehouseId);
+		}
+		//	Validate UOM
+		OrderUtil.updateUomAndQuantity(orderLine, unitOfMeasureId, quantityToChange);
+		//	Set values
+		orderLine.setTax();
+		orderLine.saveEx(transactionName);
+		//	Apply Discount from order
+		configureDiscountRateOff(order, (BigDecimal) order.get_Value("FlatDiscount"), transactionName);
+
+		return orderLine;
 	} //	UpdateLine
 	
 	/**
@@ -4839,6 +5385,12 @@ public class PointOfSalesForm extends StoreImplBase {
 	private ListPointOfSalesResponse.Builder listPointOfSales(ListPointOfSalesRequest request) {
 		int salesRepresentativeId = Env.getAD_User_ID(Env.getCtx());
 
+		//	Add to recent Item
+		org.spin.dictionary.util.DictionaryUtil.addToRecentItem(
+			MMenu.ACTION_Form,
+			113
+		);
+
 		//	Get page and count
 		String nexPageToken = null;
 		int pageNumber = LimitUtil.getPageNumber(SessionManager.getSessionUuid(), request.getPageToken());
@@ -4846,7 +5398,9 @@ public class PointOfSalesForm extends StoreImplBase {
 		int offset = (pageNumber - 1) * limit;
 
 		//	Get POS List
-		boolean isAppliedNewFeaturesPOS = M_Element.get(Env.getCtx(), "IsSharedPOS") != null && M_Element.get(Env.getCtx(), "IsAllowsAllocateSeller") != null;
+		boolean isAppliedNewFeaturesPOS = M_Element.get(Env.getCtx(), "IsSharedPOS") != null
+			&& M_Element.get(Env.getCtx(), "IsAllowsAllocateSeller") != null
+		;
 		StringBuffer whereClause = new StringBuffer("SalesRep_ID = ? ");
 		List<Object> parameters = new ArrayList<>();
 		parameters.add(salesRepresentativeId);
@@ -4859,11 +5413,17 @@ public class PointOfSalesForm extends StoreImplBase {
 			parameters.add(Env.getAD_Org_ID(Env.getCtx()));
 			parameters.add(salesRepresentativeId);
 		}
-		Query query = new Query(Env.getCtx() , I_C_POS.Table_Name , whereClause.toString(), null)
-				.setClient_ID()
-				.setOnlyActiveRecords(true)
-				.setParameters(parameters)
-				.setOrderBy(I_C_POS.COLUMNNAME_Name);
+		Query query = new Query(
+			Env.getCtx(),
+			I_C_POS.Table_Name,
+			whereClause.toString(),
+			null
+		)
+			.setClient_ID()
+			.setOnlyActiveRecords(true)
+			.setParameters(parameters)
+			.setOrderBy(I_C_POS.COLUMNNAME_Name)
+		;
 		int count = query.count();
 		ListPointOfSalesResponse.Builder builder = ListPointOfSalesResponse.newBuilder()
 			.setRecordCount(count)
@@ -4881,7 +5441,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -4914,25 +5474,10 @@ public class PointOfSalesForm extends StoreImplBase {
 	 */
 	private PointOfSales.Builder getPosBuilder(PointOfSalesRequest request) {
 		return convertPointOfSales(
-			getPOSFromId(request.getId(), true)
+			POS.validateAndGetPOS(request.getId(), true)
 		);
 	}
 
-	/**
-	 * Get POS from UUID
-	 * @param uuid
-	 * @return
-	 */
-	private MPOS getPOSFromId(int posId, boolean requery) {
-		if(posId <= 0) {
-			throw new AdempiereException("@C_POS_ID@ @NotFound@");
-		}
-		if(requery) {
-			return new MPOS(Env.getCtx(), posId, null);
-		}
-		return MPOS.get(Env.getCtx(), posId);
-	}
-	
 	/**
 	 * Convert POS
 	 * @param pos
@@ -4940,18 +5485,30 @@ public class PointOfSalesForm extends StoreImplBase {
 	 */
 	private PointOfSales.Builder convertPointOfSales(MPOS pos) {
 		PointOfSales.Builder builder = PointOfSales.newBuilder()
-			.setId(pos.getC_POS_ID())
+			.setId(
+				pos.getC_POS_ID()
+			)
 			.setName(
-				ValueManager.validateNull(pos.getName())
+				StringManager.getValidString(
+					pos.getName()
+				)
 			)
 			.setDescription(
-				ValueManager.validateNull(pos.getDescription())
+				StringManager.getValidString(
+					pos.getDescription()
+				)
 			)
 			.setHelp(
-				ValueManager.validateNull(pos.getHelp())
+				StringManager.getValidString(
+					pos.getHelp()
+				)
 			)
-			.setIsModifyPrice(pos.isModifyPrice())
-			.setIsPosRequiredPin(pos.isPOSRequiredPIN())
+			.setIsModifyPrice(
+				pos.isModifyPrice()
+			)
+			.setIsPosRequiredPin(
+				pos.isPOSRequiredPIN()
+			)
 			.setSalesRepresentative(
 				CoreFunctionalityConvert.convertSalesRepresentative(
 					MUser.get(pos.getCtx(), pos.getSalesRep_ID())
@@ -4962,65 +5519,29 @@ public class PointOfSalesForm extends StoreImplBase {
 					pos.getBPartner()
 				)
 			)
-			.setKeyLayoutId(pos.getC_POSKeyLayout_ID())
-			.setIsAisleSeller(pos.get_ValueAsBoolean("IsAisleSeller"))
-			.setIsSharedPos(pos.get_ValueAsBoolean("IsSharedPOS"))
-			.setConversionTypeId(pos.get_ValueAsInt(I_C_ConversionType.COLUMNNAME_C_ConversionType_ID))
+			.setKeyLayoutId(
+				pos.getC_POSKeyLayout_ID()
+			)
+			.setIsAisleSeller(
+				pos.get_ValueAsBoolean("IsAisleSeller")
+			)
+			.setIsSharedPos(
+				pos.get_ValueAsBoolean("IsSharedPOS")
+			)
+			.setConversionTypeId(
+				pos.get_ValueAsInt(I_C_ConversionType.COLUMNNAME_C_ConversionType_ID)
+			)
 		;
 
 		int userId = Env.getAD_User_ID(pos.getCtx());
 		//	Special values
 		builder
-			.setMaximumRefundAllowed(
-				NumberManager.getBigDecimalToString(
-					getBigDecimalValueFromPOS(
-						pos,
-						userId,
-						ColumnsAdded.COLUMNNAME_MaximumRefundAllowed
-					)
-				)
-			)
-			.setMaximumDailyRefundAllowed(
-				NumberManager.getBigDecimalToString(
-					getBigDecimalValueFromPOS(
-						pos,
-						userId,
-						ColumnsAdded.COLUMNNAME_MaximumDailyRefundAllowed
-					)
-				)
-			)
-			.setMaximumDiscountAllowed(
-				NumberManager.getBigDecimalToString(
-					getBigDecimalValueFromPOS(
-						pos,
-						userId,
-						ColumnsAdded.COLUMNNAME_MaximumDiscountAllowed
-					)
-				)
-			)
-			.setMaximumLineDiscountAllowed(
-				NumberManager.getBigDecimalToString(
-					getBigDecimalValueFromPOS(
-						pos,
-						userId,
-						ColumnsAdded.COLUMNNAME_MaximumLineDiscountAllowed
-					)
-				)
-			)
-			.setWriteOffAmountTolerance(
-				NumberManager.getBigDecimalToString(
-					getWriteOffAmtTolerance(pos)
-				)
-			)
-			.setWriteOffPercentageTolerance(
-				NumberManager.getBigDecimalToString(
-					getBigDecimalValueFromPOS(
-						pos,
-						userId,
-						ColumnsAdded.COLUMNNAME_MaximumLineDiscountAllowed
-					)
-				)
-			)
+			.setMaximumRefundAllowed(NumberManager.getBigDecimalToString(getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumRefundAllowed)))
+			.setMaximumDailyRefundAllowed(NumberManager.getBigDecimalToString(getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumDailyRefundAllowed)))
+			.setMaximumDiscountAllowed(NumberManager.getBigDecimalToString(getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumDiscountAllowed)))
+			.setMaximumLineDiscountAllowed(NumberManager.getBigDecimalToString(getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumLineDiscountAllowed)))
+			.setWriteOffAmountTolerance(NumberManager.getBigDecimalToString(getWriteOffAmtTolerance(pos)))
+			.setWriteOffPercentageTolerance(NumberManager.getBigDecimalToString(getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumLineDiscountAllowed)))
 			.setIsAllowsModifyQuantity(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsModifyQuantity))
 			.setIsAllowsReturnOrder(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsReturnOrder))
 			.setIsAllowsCollectOrder(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsCollectOrder))
@@ -5044,77 +5565,64 @@ public class PointOfSalesForm extends StoreImplBase {
 			.setIsModifyPrice(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsModifyPrice))
 			.setIsAllowsDetailCashClosing(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsDetailCashClosing))
 			.setIsWriteOffByPercent(getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_ECA14_WriteOffByPercent))
+			.setIsAllowsCustomerTemplate(
+				getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsCustomerTemplate)
+			)
+			.setIsAllowsApplySchemaDiscount(
+				getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsApplyShemaDiscount)
+			)
+			.setMaximumSchemaDiscountAllowed(
+				NumberManager.getBigDecimalToString(
+					getBigDecimalValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_MaximumShemaDiscountAllowed)
+				)
+			)
+			.setIsAllowsGiftCard(
+				getBooleanValueFromPOS(pos, userId, ColumnsAdded.COLUMNNAME_IsAllowsGiftCard)
+			)
+			.setDefaultGiftCardChargeId(
+				pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_DefaultGiftCardCharge_ID)
+			)
 		;
 
 		if(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_RefundReferenceCurrency_ID) > 0) {
-			builder.setRefundReferenceCurrency(
-				CoreFunctionalityConvert.convertCurrency(
-					pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_RefundReferenceCurrency_ID)
-				)
-			);
+			builder.setRefundReferenceCurrency(CoreFunctionalityConvert.convertCurrency(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_RefundReferenceCurrency_ID)));
 		}
 		//	Set Price List and currency
 		if(pos.getM_PriceList_ID() != 0) {
 			MPriceList priceList = MPriceList.get(Env.getCtx(), pos.getM_PriceList_ID(), null);
-			builder.setPriceList(
-				CoreFunctionalityConvert.convertPriceList(priceList)
-			);
+			builder.setPriceList(CoreFunctionalityConvert.convertPriceList(priceList));
 		}
 		//	Bank Account
 		if(pos.getC_BankAccount_ID() != 0) {
 			MBankAccount cashAccount = MBankAccount.get(Env.getCtx(), pos.getC_BankAccount_ID());
 			builder.setDefaultOpeningChargeId(cashAccount.get_ValueAsInt("DefaultOpeningCharge_ID"))
 				.setDefaultWithdrawalChargeId(cashAccount.get_ValueAsInt("DefaultWithdrawalCharge_ID"))
-				.setCashBankAccount(
-					CoreFunctionalityConvert.convertBankAccount(cashAccount)
-				);
+				.setCashBankAccount(CoreFunctionalityConvert.convertBankAccount(cashAccount));
 		}
 		//	Bank Account to transfer
 		if(pos.getCashTransferBankAccount_ID() != 0) {
-			builder.setCashBankAccount(
-				CoreFunctionalityConvert.convertBankAccount(
-					pos.getCashTransferBankAccount_ID()
-				)
-			);
+			builder.setCashBankAccount(CoreFunctionalityConvert.convertBankAccount(pos.getCashTransferBankAccount_ID()));
 		}
 		//	Warehouse
 		if(pos.getM_Warehouse_ID() > 0) {
 			MWarehouse warehouse = MWarehouse.get(Env.getCtx(), pos.getM_Warehouse_ID());
-			builder.setWarehouse(
-				CoreFunctionalityConvert.convertWarehouse(warehouse)
-			);
+			builder.setWarehouse(CoreFunctionalityConvert.convertWarehouse(warehouse));
 		}
 		//	Price List
 		if(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DisplayCurrency_ID) > 0) {
-			builder.setDisplayCurrency(
-				CoreFunctionalityConvert.convertCurrency(
-					pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DisplayCurrency_ID)
-				)
-			);
+			builder.setDisplayCurrency(CoreFunctionalityConvert.convertCurrency(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DisplayCurrency_ID)));
 		}
 		//	Document Type
 		if(pos.getC_DocType_ID() > 0) {
-			builder.setDocumentType(
-				CoreFunctionalityConvert.convertDocumentType(
-					pos.getC_DocType_ID()
-				)
-			);
+			builder.setDocumentType(CoreFunctionalityConvert.convertDocumentType(pos.getC_DocType_ID()));
 		}
 		//	Return Document Type
 		if(pos.get_ValueAsInt("C_DocTypeRMA_ID") > 0) {
-			builder.setReturnDocumentType(
-				CoreFunctionalityConvert.convertDocumentType(
-					pos.get_ValueAsInt("C_DocTypeRMA_ID")
-				)
-			);
+			builder.setReturnDocumentType(CoreFunctionalityConvert.convertDocumentType(pos.get_ValueAsInt("C_DocTypeRMA_ID")));
 		}
 		// Campaign
 		if (pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DefaultCampaign_ID) > 0) {
-			builder.setDefaultCampaign(
-				POSConvertUtil.convertCampaign(
-					pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DefaultCampaign_ID)
-				)
-			);
+			builder.setDefaultCampaign(POSConvertUtil.convertCampaign(pos.get_ValueAsInt(ColumnsAdded.COLUMNNAME_DefaultCampaign_ID)));
 		}
 		
 		return builder;
@@ -5150,7 +5658,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		}
 		AtomicReference<MOrder> maybeOrder = new AtomicReference<MOrder>();
 		Trx.run(transactionName -> {
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			StringBuffer whereClause = new StringBuffer("DocStatus = 'DR' "
 					+ "AND C_POS_ID = ? "
 					+ "AND NOT EXISTS(SELECT 1 "
@@ -5239,7 +5747,9 @@ public class PointOfSalesForm extends StoreImplBase {
 			maybeOrder.set(salesOrder);
 		});
 		//	Convert order
-		return ConvertUtil.convertOrder(maybeOrder.get());
+		return OrderConverUtil.convertOrder(
+			maybeOrder.get()
+		);
 	}
 	
 	/**
@@ -5363,14 +5873,17 @@ public class PointOfSalesForm extends StoreImplBase {
 	 * @return
 	 */
 	private MPayment updatePayment(UpdatePaymentRequest request) {
+		if (request.getId() <= 0) {
+			throw new AdempiereException("@FillMandatory@ @C_Payment_ID@");
+		}
 		AtomicReference<MPayment> maybePayment = new AtomicReference<MPayment>();
 		Trx.run(transactionName -> {
 			String tenderType = request.getTenderTypeCode();
-			int paymentId = request.getId();
-			if(paymentId <= 0) {
+			final int paymentId = request.getId();
+			MPayment payment = new MPayment(Env.getCtx(), paymentId, transactionName);
+			if (payment == null || payment.getC_Payment_ID() <= 0) {
 				throw new AdempiereException("@C_Payment_ID@ @NotFound@");
 			}
-			MPayment payment = new MPayment(Env.getCtx(), paymentId, transactionName);
 			if(!DocumentUtil.isDrafted(payment)) {
 				throw new AdempiereException("@C_Payment_ID@ @Processed@");
 			}
@@ -5385,18 +5898,18 @@ public class PointOfSalesForm extends StoreImplBase {
 				Timestamp date = ValueManager.getDateFromTimestampDate(
 					request.getPaymentDate()
 				);
-	        	if(date != null) {
-	        		payment.setDateTrx(date);
-	        	}
-	        }
+				if(date != null) {
+					payment.setDateTrx(date);
+				}
+			}
 			if(ValueManager.getDateFromTimestampDate(request.getPaymentAccountDate()) != null) {
 				Timestamp date = ValueManager.getDateFromTimestampDate(
 					request.getPaymentAccountDate()
 				);
-	        	if(date != null) {
-	        		payment.setDateAcct(date);
-	        	}
-	        }
+				if(date != null) {
+					payment.setDateAcct(date);
+				}
+			}
 			//	Set Bank Id
 			if(request.getBankId() > 0) {
 				payment.set_ValueOfColumn(MBank.COLUMNNAME_C_Bank_ID, request.getBankId());
@@ -5413,9 +5926,9 @@ public class PointOfSalesForm extends StoreImplBase {
 			BigDecimal paymentAmount = NumberManager.getBigDecimalFromString(
 				request.getAmount()
 			);
-	        payment.setPayAmt(paymentAmount);
-	        payment.setOverUnderAmt(Env.ZERO);
-	        CashUtil.setCurrentDate(payment);
+			payment.setPayAmt(paymentAmount);
+			payment.setOverUnderAmt(Env.ZERO);
+			CashUtil.setCurrentDate(payment);
 			payment.saveEx(transactionName);
 			maybePayment.set(payment);
 		});
@@ -5431,7 +5944,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	private MPayment createPayment(CreatePaymentRequest request) {
 		AtomicReference<MPayment> maybePayment = new AtomicReference<MPayment>();
 		Trx.run(transactionName -> {
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			if(request.getOrderId() > 0) {
 				MOrder salesOrder = getOrder(request.getOrderId(), transactionName);
 				maybePayment.set(CollectingManagement.createPaymentFromOrder(salesOrder, request, pos, transactionName));
@@ -5453,7 +5966,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	 */
 	private ListProductPriceResponse.Builder getProductPriceList(ListProductPriceRequest request) {
 		ListProductPriceResponse.Builder builder = ListProductPriceResponse.newBuilder();
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		//	Validate Price List
 		int priceListId = pos.getM_PriceList_ID();
 		if(request.getPriceListId() > 0) {
@@ -5478,6 +5991,7 @@ public class PointOfSalesForm extends StoreImplBase {
 
 		//	Dynamic where clause
 		StringBuffer whereClause = new StringBuffer();
+		whereClause.append("IsSold = 'Y' ");
 		//	Parameters
 		List<Object> parameters = new ArrayList<Object>();
 
@@ -5486,32 +6000,35 @@ public class PointOfSalesForm extends StoreImplBase {
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {
-			whereClause.append("IsSold = 'Y' "
-				+ "AND ("
+			whereClause.append(
+				"AND ("
 				+ "UPPER(Value) LIKE '%' || UPPER(?) || '%'"
 				+ "OR UPPER(Name) LIKE '%' || UPPER(?) || '%'"
 				+ "OR UPPER(UPC) = UPPER(?)"
 				+ "OR UPPER(SKU) = UPPER(?)"
-				+ ")");
+				+ ")"
+			);
 			//	Add parameters
 			parameters.add(searchValue);
 			parameters.add(searchValue);
 			parameters.add(searchValue);
 			parameters.add(searchValue);
-		} 
-		//	for price list
-		if(whereClause.length() > 0) {
-			whereClause.append(" AND ");
 		}
+
 		//	Add Price List
-		whereClause.append("(EXISTS(SELECT 1 FROM M_PriceList_Version plv "
-				+ "INNER JOIN M_ProductPrice pp ON(pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID) "
+		whereClause.append(
+			"AND EXISTS("
+				+ "SELECT 1 FROM M_PriceList_Version AS plv "
+				+ "INNER JOIN M_ProductPrice AS pp "
+				+ "ON(pp.M_PriceList_Version_ID = plv.M_PriceList_Version_ID) "
 				+ "WHERE plv.M_PriceList_ID = ? "
 				+ "AND plv.ValidFrom <= ? "
 				+ "AND plv.IsActive = 'Y' "
-				+ "AND pp.PriceList IS NOT NULL AND pp.PriceList > 0 "
-				+ "AND pp.PriceStd IS NOT NULL AND pp.PriceStd > 0 "
-				+ "AND pp.M_Product_ID = M_Product.M_Product_ID))");
+				// + "AND pp.PriceList IS NOT NULL AND pp.PriceList > 0 "
+				// + "AND pp.PriceStd IS NOT NULL AND pp.PriceStd > 0 "
+				+ "AND pp.M_Product_ID = M_Product.M_Product_ID"
+			+ ")"
+		);
 		//	Add parameters
 		parameters.add(priceList.getM_PriceList_ID());
 		parameters.add(TimeUtil.getDay(validFrom.get()));
@@ -5523,11 +6040,16 @@ public class PointOfSalesForm extends StoreImplBase {
 		int displayCurrencyId = pos.get_ValueAsInt("DisplayCurrency_ID");
 		int conversionTypeId = pos.get_ValueAsInt("C_ConversionType_ID");
 		//	Get Product list
-		Query query = new Query(Env.getCtx(), I_M_Product.Table_Name, 
-				whereClause.toString(), null)
-				.setParameters(parameters)
-				.setClient_ID()
-				.setOnlyActiveRecords(true);
+		Query query = new Query(
+			Env.getCtx(),
+			I_M_Product.Table_Name,
+			whereClause.toString(),
+			null
+		)
+			.setParameters(parameters)
+			.setClient_ID()
+			.setOnlyActiveRecords(true)
+		;
 		int count = query.count();
 		query
 		.setLimit(limit, offset)
@@ -5552,7 +6074,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -5588,29 +6110,23 @@ public class PointOfSalesForm extends StoreImplBase {
 		;
 		//	Validate
 		if(optionalTax.isPresent()) {
-			builder.setTaxRate(
-				CoreFunctionalityConvert.convertTaxRate(
-					optionalTax.get()
-				)
-			);
+			builder.setTaxRate(CoreFunctionalityConvert.convertTaxRate(optionalTax.get()));
 		}
 		//	Set currency
-		builder.setCurrency(
-			CoreFunctionalityConvert.convertCurrency(
-				priceList.getC_Currency_ID()
-			)
-		);
+		builder.setCurrency(CoreFunctionalityConvert.convertCurrency(priceList.getC_Currency_ID()));
 		//	Price List Attributes
-		builder.setIsTaxIncluded(priceList.isTaxIncluded())
+		builder.setIsTaxIncluded(
+				priceList.isTaxIncluded()
+			)
 			.setValidFrom(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					TimeManager.getTimestampToString(
 						productPricing.getPriceDate()
 					)
 				)
 			)
 			.setPriceListName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					priceList.getName()
 				)
 			)
@@ -5619,31 +6135,13 @@ public class PointOfSalesForm extends StoreImplBase {
 		builder.setPricePrecision(productPricing.getPrecision());
 		//	Prices
 		if(Optional.ofNullable(productPricing.getPriceStd()).orElse(Env.ZERO).signum() > 0) {
-			builder.setPriceList(
-					NumberManager.getBigDecimalToString(
-						Optional.ofNullable(productPricing.getPriceList()).orElse(Env.ZERO)
-					)
-				)
-				.setPriceStandard(
-					NumberManager.getBigDecimalToString(
-						Optional.ofNullable(productPricing.getPriceStd()).orElse(Env.ZERO)
-					)
-				)
-				.setPriceLimit(
-					NumberManager.getBigDecimalToString(
-						Optional.ofNullable(
-							productPricing.getPriceLimit()
-						).orElse(Env.ZERO)
-					)
-				)
+			builder.setPriceList(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceList()).orElse(Env.ZERO)))
+				.setPriceStandard(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceStd()).orElse(Env.ZERO)))
+				.setPriceLimit(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceLimit()).orElse(Env.ZERO)))
 			;
 			//	Get from schema
 			if(displayCurrencyId > 0) {
-				builder.setDisplayCurrency(
-					CoreFunctionalityConvert.convertCurrency(
-						displayCurrencyId
-					)
-				);
+				builder.setDisplayCurrency(CoreFunctionalityConvert.convertCurrency(displayCurrencyId));
 				//	Get
 				int conversionRateId = MConversionRate.getConversionRateId(priceList.getC_Currency_ID(), displayCurrencyId, RecordUtil.getDate(), conversionTypeId, Env.getAD_Client_ID(Env.getCtx()), Env.getAD_Org_ID(Env.getCtx()));
 				if(conversionRateId > 0) {
@@ -5651,38 +6149,10 @@ public class PointOfSalesForm extends StoreImplBase {
 					MConversionRate conversionRate = MConversionRate.get(Env.getCtx(), conversionRateId);
 					if(conversionRate != null) {
 						BigDecimal multiplyRate = conversionRate.getMultiplyRate();
-						builder.setDisplayPriceList(
-								NumberManager.getBigDecimalToString(
-									Optional.ofNullable(
-										productPricing.getPriceList()
-									)
-										.orElse(Env.ZERO)
-										.multiply(multiplyRate, MathContext.DECIMAL128)
-								)
-							)
-							.setDisplayPriceStandard(
-								NumberManager.getBigDecimalToString(
-									Optional.ofNullable(
-										productPricing.getPriceStd()
-									)
-										.orElse(Env.ZERO)
-										.multiply(multiplyRate, MathContext.DECIMAL128)
-								)
-							)
-							.setDisplayPriceLimit(
-								NumberManager.getBigDecimalToString(
-									Optional.ofNullable(
-										productPricing.getPriceLimit()
-									)
-										.orElse(Env.ZERO)
-										.multiply(multiplyRate, MathContext.DECIMAL128)
-								)
-							)
-							.setConversionRate(
-								CoreFunctionalityConvert.convertConversionRate(
-									conversionRate
-								)
-							)
+						builder.setDisplayPriceList(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceList()).orElse(Env.ZERO).multiply(multiplyRate, MathContext.DECIMAL128)))
+							.setDisplayPriceStandard(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceStd()).orElse(Env.ZERO).multiply(multiplyRate, MathContext.DECIMAL128)))
+							.setDisplayPriceLimit(NumberManager.getBigDecimalToString(Optional.ofNullable(productPricing.getPriceLimit()).orElse(Env.ZERO).multiply(multiplyRate, MathContext.DECIMAL128)))
+							.setConversionRate(CoreFunctionalityConvert.convertConversionRate(conversionRate))
 						;
 					}
 				}
@@ -5704,26 +6174,10 @@ public class PointOfSalesForm extends StoreImplBase {
 					quantityOrdered.updateAndGet(quantity -> quantity.add(storage.getQtyOrdered()));
 					quantityAvailable.updateAndGet(quantity -> quantity.add(storage.getQtyOnHand().subtract(storage.getQtyReserved())));
 				});
-			builder.setQuantityOnHand(
-					NumberManager.getBigDecimalToString(
-						quantityOnHand.get()
-					)
-				)
-				.setQuantityReserved(
-					NumberManager.getBigDecimalToString(
-						quantityReserved.get()
-					)
-				)
-				.setQuantityOrdered(
-					NumberManager.getBigDecimalToString(
-						quantityOrdered.get()
-					)
-				)
-				.setQuantityAvailable(
-					NumberManager.getBigDecimalToString(
-						quantityAvailable.get()
-					)
-				)
+			builder.setQuantityOnHand(NumberManager.getBigDecimalToString(quantityOnHand.get()))
+				.setQuantityReserved(NumberManager.getBigDecimalToString(quantityReserved.get()))
+				.setQuantityOrdered(NumberManager.getBigDecimalToString(quantityOrdered.get()))
+				.setQuantityAvailable(NumberManager.getBigDecimalToString(quantityAvailable.get()))
 			;
 		}
 		return builder;
@@ -5838,7 +6292,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		if(product == null) {
 			throw new AdempiereException("@M_Product_ID@ @NotFound@");
 		}
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 		//	Validate Price List
 		int priceListId = pos.getM_PriceList_ID();
 		if(request.getPriceListId() > 0) {
@@ -5903,7 +6357,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	private ListStocksResponse.Builder listStocks(ListStocksRequest request) {
 		ListStocksResponse.Builder builder = ListStocksResponse.newBuilder();
 		Trx.run(transactionName -> {
-			MPOS pos = getPOSFromId(request.getPosId(), true);
+			MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 			String sku = request.getSku();
 			if(request.getSku().contains(":")) {
 				sku = request.getSku().split(":")[0];
@@ -5960,7 +6414,7 @@ public class PointOfSalesForm extends StoreImplBase {
 				nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 			}
 			builder.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			);
 		});
 		
@@ -6046,7 +6500,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		Trx.run(transactionName -> {
 			MAttributeSetInstance attribute = new MAttributeSetInstance(Env.getCtx(), storage.getM_AttributeSetInstance_ID(), transactionName);
 			builder.setAttributeName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					attribute.getDescription()
 				)
 			);
@@ -6125,18 +6579,22 @@ public class PointOfSalesForm extends StoreImplBase {
 			.forEach(availableCash -> {
 				MBankAccount bankAccount = MBankAccount.get(context, availableCash.get_ValueAsInt("C_BankAccount_ID"));
 				AvailableCash.Builder availableCashBuilder = AvailableCash.newBuilder()
-					.setId(bankAccount.getC_BankAccount_ID())
+					.setId(
+						bankAccount.getC_BankAccount_ID()
+					)
 					.setName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							bankAccount.getName()
 						)
 					)
 					.setKey(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							bankAccount.getAccountNo()
 						)
 					)
-					.setIsPosRequiredPin(availableCash.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN))
+					.setIsPosRequiredPin(
+						availableCash.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN)
+					)
 					.setBankAccount(
 						CoreFunctionalityConvert.convertBankAccount(
 							bankAccount
@@ -6153,7 +6611,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(nexPageToken)
 		);
 		return builder;
 	}
@@ -6178,7 +6636,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	}
 
 	private CommandShortcut.Builder saveCommandShortcut(SaveCommandShortcutRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 
 		if (Util.isEmpty(request.getCommand(), true)) {
 			throw new AdempiereException("@ECA14_Command@ @NotFound@");
@@ -6239,7 +6697,7 @@ public class PointOfSalesForm extends StoreImplBase {
 	}
 
 	private ListCommandShortcutsResponse.Builder listCommandShortcuts(ListCommandShortcutsRequest request) {
-		MPOS pos = getPOSFromId(request.getPosId(), true);
+		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 
 		Query query = new Query(
 			Env.getCtx(),
@@ -6265,7 +6723,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		ListCommandShortcutsResponse.Builder builderList = ListCommandShortcutsResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 

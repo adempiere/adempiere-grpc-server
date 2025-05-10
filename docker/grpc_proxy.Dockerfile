@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy:v1.31.0
+FROM envoyproxy/envoy:v1.33.2
 
 LABEL maintainer="ySenih@erpya.com; EdwinBetanc0urt@outlook.com;" \
 	description="Proxy Transcoding gRPC to JSON via http"
@@ -11,8 +11,8 @@ ENV \
 	BACKEND_PORT="50059" \
 	SERVICES_ENABLED="bank_statement_match.BankStatementMatch; \
 		core_functionality.CoreFunctionality; data.BusinessData; data.Store; \
-		dashboarding.Dashboarding; dictionary.Dictionary; enrollment.Register \
-		express_movement.ExpressMovement; express_receipt.ExpressReceipt; \
+		dashboarding.Dashboarding; dictionary.Dictionary; display_definition.DisplayDefinition; \
+		enrollment.Register; express_movement.ExpressMovement; express_receipt.ExpressReceipt; \
 		express_shipment.ExpressShipment; field.FieldManagementService; \
 		field.business_partner.BusinessPartnerInfoService; field.in_out.InOutInfoService; \
 		field.invoice.InvoiceInfoService; field.order.OrderInfoService; \
@@ -43,7 +43,7 @@ WORKDIR /etc/envoy/
 COPY docker/envoy_template.yaml /etc/envoy/envoy_template.yaml
 
 # Proto gRPC descriptor
-COPY docker/adempiere-grpc-server.pb /data/adempiere-grpc-server.pb
+COPY docker/adempiere-grpc-server.dsc /data/adempiere-grpc-server.dsc
 COPY docker/start_grpc_proxy.sh /etc/envoy/start.sh
 
 

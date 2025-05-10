@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.adempiere.core.domains.models.I_AD_ChangeLog;
-import org.adempiere.core.domains.models.X_AD_Reference;
 import org.adempiere.model.MBrowse;
 import org.adempiere.model.MBrowseField;
 import org.adempiere.model.MView;
@@ -72,6 +70,9 @@ public class QueryUtil {
 		final Language language = Language.getLanguage(Env.getAD_Language(table.getCtx()));
 		final List<MColumn> columnsList = table.getColumnsAsList();
 		for (MColumn column : columnsList) {
+			if (column == null) {
+				continue;
+			}
 			if (!column.isActive()) {
 				// key column on table
 				if (!column.isKey()) {
@@ -87,69 +88,49 @@ public class QueryUtil {
 				queryToAdd.append(", ")
 					.append(columnSQL)
 					.append(" AS ")
-					.append(columnName)
+					.append("\"" + columnName + "\"")
 				;
 			}
 
 			//	Reference Value
 			int referenceValueId = column.getAD_Reference_Value_ID();
 
-			if (DisplayType.Button == displayTypeId) {
-				//	Reference Value
-				if (referenceValueId > 0) {
-					X_AD_Reference reference = new X_AD_Reference(column.getCtx(), referenceValueId, null);
-					if (reference != null && reference.getAD_Reference_ID() > 0) {
-						// overwrite display type to Table or List
-						if (X_AD_Reference.VALIDATIONTYPE_TableValidation.equals(reference.getValidationType())) {
-							displayTypeId = DisplayType.Table;
-						} else {
-							displayTypeId = DisplayType.List;
-						}
-					}
-				} else if (columnName.equals(I_AD_ChangeLog.COLUMNNAME_Record_ID)) {
-					// int tableId = Env.getContextAsInt(column.getCtx(), 0, I_AD_Table.COLUMNNAME_AD_Table_ID);
-					// MTable tableButton = MTable.get(column.getCtx(), tableId);
-					// String tableKeyColumn = tableButton.getTableName() + "_ID";
-					// columnName = tableKeyColumn;
-					// // overwrite display type to Table Direct
-					// displayTypeId = DisplayType.TableDir;
-				}
-			}
+			// overwrite display type `Button` to `List`, example `PaymentRule` or `Posted`
+			displayTypeId = ReferenceUtil.overwriteDisplayType(
+				displayTypeId,
+				referenceValueId
+			);
 
 			if (ReferenceUtil.validateReference(displayTypeId)) {
-				// Add display virutal column
-				if (!Util.isEmpty(columnSQL, true)) {
-					StringBuffer displayColumnSQL = new StringBuffer()
-						.append(", ")
-						.append(columnSQL)
-						.append(" AS ")
-						.append(
-							LookupUtil.getDisplayColumnName(
-								columnName
-							)
-						)
-					;
-					queryToAdd.append(displayColumnSQL);
-					continue;
-				}
-
 				if (columnName.equals(tableName + "_ID")) {
 					// overwrite to correct sub-query table alias
 					displayTypeId = DisplayType.ID;
 				}
-				final ReferenceInfo referenceInfo = ReferenceUtil.getInstance(column.getCtx())
-					.getReferenceInfo(
-						displayTypeId,
-						referenceValueId,
-						columnName,
-						language.getAD_Language(),
-						tableAlias
-					);
+				final ReferenceInfo referenceInfo = ReferenceUtil.getInstance(
+					column.getCtx()
+				)
+				.getReferenceInfo(
+					displayTypeId,
+					referenceValueId,
+					columnName,
+					language.getAD_Language(),
+					tableAlias
+				);
 				if(referenceInfo != null) {
+					String joinClause = referenceInfo.getJoinValue(columnName, tableAlias);
+					String displayColumn = referenceInfo.getDisplayValue(columnName);
+				
+					// Add display virutal column
+					if (!Util.isEmpty(columnSQL, true)) {
+						if (!Util.isEmpty(joinClause, true)) {
+							joinClause = joinClause.replace(tableAlias + "." + columnName, columnSQL);
+						} else {
+							displayColumn = displayColumn.replace(tableAlias + "." + columnName, columnSQL);
+						}
+					}
+
 					queryToAdd.append(", ");
-					final String displayColumn = referenceInfo.getDisplayValue(columnName);
 					queryToAdd.append(displayColumn);
-					final String joinClause = referenceInfo.getJoinValue(columnName, tableAlias);
 					joinsToAdd.append(joinClause);
 				}
 			}
@@ -191,6 +172,9 @@ public class QueryUtil {
 		final Language language = Language.getLanguage(Env.getAD_Language(context));
 		final MField[] fieldsList = tab.getFields(false, null);
 		for (MField field : fieldsList) {
+			if (field == null) {
+				continue;
+			}
 			MColumn column = MColumn.get(context, field.getAD_Column_ID());
 			if (!column.isActive() || !field.isActive() || !field.isDisplayed()) {
 				// key column on table
@@ -206,7 +190,7 @@ public class QueryUtil {
 				queryToAdd.append(", ")
 					.append(columnSQL)
 					.append(" AS ")
-					.append(columnName)
+					.append("\"" + columnName + "\"")
 				;
 			}
 
@@ -221,45 +205,13 @@ public class QueryUtil {
 				referenceValueId = column.getAD_Reference_Value_ID();
 			}
 
-			if (DisplayType.Button == displayTypeId) {
-				//	Reference Value
-				if (referenceValueId > 0) {
-					X_AD_Reference reference = new X_AD_Reference(field.getCtx(), referenceValueId, null);
-					if (reference != null && reference.getAD_Reference_ID() > 0) {
-						// overwrite display type to Table or List
-						if (X_AD_Reference.VALIDATIONTYPE_TableValidation.equals(reference.getValidationType())) {
-							displayTypeId = DisplayType.Table;
-						} else {
-							displayTypeId = DisplayType.List;
-						}
-					}
-				} else if (columnName.equals(I_AD_ChangeLog.COLUMNNAME_Record_ID)) {
-					// int tableId = Env.getContextAsInt(field.getCtx(), 0, I_AD_Table.COLUMNNAME_AD_Table_ID);
-					// MTable tableButton = MTable.get(field.getCtx(), tableId);
-					// String tableKeyColumn = tableButton.getTableName() + "_ID";
-					// columnName = tableKeyColumn;
-					// // overwrite display type to Table Direct
-					// displayTypeId = DisplayType.TableDir;
-				}
-			}
+			// overwrite display type `Button` to `List`, example `PaymentRule` or `Posted`
+			displayTypeId = ReferenceUtil.overwriteDisplayType(
+				displayTypeId,
+				referenceValueId
+			);
 
 			if (ReferenceUtil.validateReference(displayTypeId)) {
-				// Add display virutal column
-				if (!Util.isEmpty(columnSQL, true)) {
-					StringBuffer displayColumnSQL = new StringBuffer()
-						.append(", ")
-						.append(columnSQL)
-						.append(" AS ")
-						.append(
-							LookupUtil.getDisplayColumnName(
-								columnName
-							)
-						)
-					;
-					queryToAdd.append(displayColumnSQL);
-					continue;
-				}
-
 				if (columnName.equals(tableName + "_ID")) {
 					// overwrite to correct sub-query table alias
 					displayTypeId = DisplayType.ID;
@@ -274,10 +226,20 @@ public class QueryUtil {
 					tableAlias
 				);
 				if(referenceInfo != null) {
+					String joinClause = referenceInfo.getJoinValue(columnName, tableAlias);
+					String displayColumn = referenceInfo.getDisplayValue(columnName);
+				
+					// Add display virutal column
+					if (!Util.isEmpty(columnSQL, true)) {
+						if (!Util.isEmpty(joinClause, true)) {
+							joinClause = joinClause.replace(tableAlias + "." + columnName, columnSQL);
+						} else {
+							displayColumn = displayColumn.replace(tableAlias + "." + columnName, columnSQL);
+						}
+					}
+
 					queryToAdd.append(", ");
-					final String displayColumn = referenceInfo.getDisplayValue(columnName);
 					queryToAdd.append(displayColumn);
-					final String joinClause = referenceInfo.getJoinValue(columnName, tableAlias);
 					joinsToAdd.append(joinClause);
 				}
 			}
@@ -301,6 +263,9 @@ public class QueryUtil {
 		AtomicBoolean isAddFirstColumn = new AtomicBoolean(false);
 		final List<MBrowseField> browseFieldsList = browser.getFields();
 		for (MBrowseField browseField : browseFieldsList) {
+			if (browseField == null) {
+				continue;
+			}
 			if (!browseField.isActive()) {
 				// key column on table
 				if (!browseField.isKey()) {
@@ -312,7 +277,7 @@ public class QueryUtil {
 				continue;
 			}
 			if (isAddFirstColumn.get()) {
-				sql.append(",");
+				sql.append(", ");
 			}
 
 			MViewColumn viewColumn = MViewColumn.getById(
@@ -352,6 +317,9 @@ public class QueryUtil {
 		final Language language = Language.getLanguage(Env.getAD_Language(browser.getCtx()));
 		final List<MBrowseField> browseFieldsList = browser.getFields();
 		for (MBrowseField browseField : browseFieldsList) {
+			if (browseField == null) {
+				continue;
+			}
 			if (!browseField.isActive()) {
 				// key column on table
 				if (!browseField.isKey()) {
@@ -364,25 +332,14 @@ public class QueryUtil {
 				continue;
 			}
 
-			int displayTypeId = browseField.getAD_Reference_ID();
-
 			//	Reference Value
 			int referenceValueId = browseField.getAD_Reference_Value_ID();
 
-			if (DisplayType.Button == displayTypeId) {
-				//	Reference Value
-				if (referenceValueId > 0) {
-					X_AD_Reference reference = new X_AD_Reference(browseField.getCtx(), referenceValueId, null);
-					if (reference != null && reference.getAD_Reference_ID() > 0) {
-						// overwrite display type to Table or List
-						if (X_AD_Reference.VALIDATIONTYPE_TableValidation.equals(reference.getValidationType())) {
-							displayTypeId = DisplayType.Table;
-						} else {
-							displayTypeId = DisplayType.List;
-						}
-					}
-				}
-			}
+			// overwrite display type `Button` to `List`, example `PaymentRule` or `Posted`
+			int displayTypeId = ReferenceUtil.overwriteDisplayType(
+				browseField.getAD_Reference_ID(),
+				referenceValueId
+			);
 
 			if (ReferenceUtil.validateReference(displayTypeId)) {
 				MViewColumn viewColumn = MViewColumn.getById(browseField.getCtx(), browseField.getAD_View_Column_ID(), null);
@@ -417,6 +374,7 @@ public class QueryUtil {
 					);
 					final String displayColumn = referenceInfo.getDisplayValue(columnName);
 					queryToAdd.append(displayColumn);
+
 					String joinClause = referenceInfo.getJoinValue(columnName, tableName);
 					if (viewColumn.getAD_Column_ID() <= 0) {
 						// sub query

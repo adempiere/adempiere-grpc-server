@@ -16,11 +16,14 @@
 
 package org.spin.pos.util;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import org.adempiere.core.domains.models.I_AD_Ref_List;
 import org.adempiere.core.domains.models.I_AD_User;
+import org.adempiere.core.domains.models.I_C_BPartner;
 import org.adempiere.core.domains.models.I_C_POS;
 import org.compiere.model.MBPartner;
 import org.compiere.model.MBPartnerLocation;
@@ -30,7 +33,6 @@ import org.compiere.model.MCity;
 import org.compiere.model.MCountry;
 import org.compiere.model.MInOutLine;
 import org.compiere.model.MLocation;
-import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
 import org.compiere.model.MRegion;
@@ -42,18 +44,25 @@ import org.compiere.model.Query;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
 import org.spin.backend.grpc.pos.Address;
+import org.spin.backend.grpc.pos.AvailableOrderLine;
+import org.spin.backend.grpc.pos.AvailablePaymentMethod;
 import org.spin.backend.grpc.pos.Bank;
 import org.spin.backend.grpc.pos.Campaign;
 import org.spin.backend.grpc.pos.City;
 import org.spin.backend.grpc.pos.CommandShortcut;
 import org.spin.backend.grpc.pos.Customer;
-import org.spin.backend.grpc.pos.Order;
+import org.spin.backend.grpc.pos.CustomerTemplate;
+import org.spin.backend.grpc.pos.GiftCard;
+import org.spin.backend.grpc.pos.GiftCardLine;
+import org.spin.backend.grpc.pos.PaymentMethod;
 import org.spin.backend.grpc.pos.Region;
 import org.spin.backend.grpc.pos.ShipmentLine;
-import org.spin.base.util.ConvertUtil;
 import org.spin.grpc.service.core_functionality.CoreFunctionalityConvert;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
+import org.spin.service.grpc.util.value.TimeManager;
 import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.store.model.MCPaymentMethod;
 import org.spin.store.util.VueStoreFrontUtil;
 
 import com.google.protobuf.Struct;
@@ -78,24 +87,26 @@ public class POSConvertUtil {
 		if (bank == null) {
 			return builder;
 		}
-		builder.setId(bank.getC_Bank_ID())
+		builder.setId(
+				bank.getC_Bank_ID()
+			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					bank.getName()
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					bank.getDescription()
 				)
 			)
 			.setRoutingNo(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					bank.getRoutingNo()
 				)
 			)
 			.setSwiftCode(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					bank.getSwiftCode()
 				)
 			)
@@ -119,14 +130,16 @@ public class POSConvertUtil {
 		if (campaign == null || campaign.getC_Campaign_ID() <= 0) {
 			return builder;
 		}
-		builder.setId(campaign.getC_Campaign_ID())
+		builder.setId(
+				campaign.getC_Campaign_ID()
+			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					campaign.getName()
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					campaign.getDescription()
 				)
 			)
@@ -145,21 +158,389 @@ public class POSConvertUtil {
 	}
 
 
+	public static AvailablePaymentMethod.Builder convertPaymentMethod(PO availablePaymentMethod) {
+		AvailablePaymentMethod.Builder tenderTypeValue = AvailablePaymentMethod.newBuilder();
+		if (availablePaymentMethod == null || availablePaymentMethod.get_ID() <= 0) {
+			return tenderTypeValue;
+		}
+
+		MTable paymentTypeTable = MTable.get(Env.getCtx(), "C_PaymentMethod");
+
+		MCPaymentMethod paymentMethod = (MCPaymentMethod) paymentTypeTable.getPO(
+			availablePaymentMethod.get_ValueAsInt("C_PaymentMethod_ID"), null
+		);
+		PaymentMethod.Builder paymentMethodBuilder = PaymentConvertUtil.convertPaymentMethod(
+			paymentMethod
+		);
+
+		final String paymentMethodName = Util.isEmpty(availablePaymentMethod.get_ValueAsString(I_AD_Ref_List.COLUMNNAME_Name), true) ?
+			paymentMethod.getName() :
+			availablePaymentMethod.get_ValueAsString(I_AD_Ref_List.COLUMNNAME_Name)
+		;
+		tenderTypeValue
+			.setId(
+				availablePaymentMethod.get_ID()
+			)
+			.setName(
+				StringManager.getValidString(
+					paymentMethodName
+				)
+			)
+			.setPosId(
+				availablePaymentMethod.get_ValueAsInt(
+					I_C_POS.COLUMNNAME_C_POS_ID
+				)
+			)
+			.setIsPosRequiredPin(
+				availablePaymentMethod.get_ValueAsBoolean(I_C_POS.COLUMNNAME_IsPOSRequiredPIN)
+			)
+			.setIsAllowedToRefund(
+				availablePaymentMethod.get_ValueAsBoolean("IsAllowedToRefund")
+			)
+			.setIsAllowedToRefundOpen(
+				availablePaymentMethod.get_ValueAsBoolean("IsAllowedToRefundOpen")
+			)
+			.setMaximumRefundAllowed(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromObject(
+						availablePaymentMethod.get_Value("MaximumRefundAllowed")
+					)
+				)
+			)
+			.setMaximumDailyRefundAllowed(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromObject(
+						availablePaymentMethod.get_Value("MaximumDailyRefundAllowed")
+					)
+				)
+			)
+			.setIsPaymentReference(
+				availablePaymentMethod.get_ValueAsBoolean("IsPaymentReference")
+			)
+			.setDocumentTypeId(
+				availablePaymentMethod.get_ValueAsInt("C_DocTypeCreditMemo_ID")
+			)
+			.setPaymentMethod(
+				paymentMethodBuilder
+			)
+			.setIsAllowsApplyDiscount(
+				availablePaymentMethod.get_ValueAsBoolean(
+					ColumnsAdded.COLUMNNAME_IsAllowsApplyDiscount
+				)
+			)
+			.setMaximumDiscountAllowed(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromObject(
+						availablePaymentMethod.get_Value(
+							ColumnsAdded.COLUMNNAME_MaximumDiscountAllowed
+						)
+					)
+				)
+			)
+			.setIsOnline(
+				availablePaymentMethod.get_ValueAsBoolean("IsOnline")
+			)
+		;
+		if(availablePaymentMethod.get_ValueAsInt("RefundReferenceCurrency_ID") > 0) {
+			tenderTypeValue.setRefundReferenceCurrency(
+				CoreFunctionalityConvert.convertCurrency(
+					availablePaymentMethod.get_ValueAsInt("RefundReferenceCurrency_ID")
+				)
+			);
+		}
+		if(availablePaymentMethod.get_ValueAsInt("ReferenceCurrency_ID") > 0) {
+			tenderTypeValue.setReferenceCurrency(
+				CoreFunctionalityConvert.convertCurrency(
+					availablePaymentMethod.get_ValueAsInt("ReferenceCurrency_ID")
+				)
+			);
+		}
+		return tenderTypeValue;
+	}
+
 
 	/**
-	 * Convert Order from entity
-	 * @param orderId
+	 * Convert giftCard from entity
+	 * @param giftCard
 	 * @return
 	 */
-	public static Order.Builder convertOder(int orderId) {
-		Order.Builder builder = Order.newBuilder();
-		if(orderId <= 0) {
+	public static GiftCard.Builder convertGiftCard(PO giftCard) {
+		GiftCard.Builder builder = GiftCard.newBuilder();
+		if (giftCard == null || giftCard.get_ID() <= 0) {
 			return builder;
 		}
-		MOrder order = new MOrder(Env.getCtx(), orderId, null);
-		return ConvertUtil.convertOrder(
-			order
-		);
+		//	Convert
+		builder
+			.setId(
+				giftCard.get_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					giftCard.get_ValueAsString("UUID")
+				)
+			)
+			.setDocumentNo(
+				StringManager.getValidString(
+					giftCard.get_ValueAsString("DocumentNo")
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					giftCard.get_ValueAsString("Description")
+				)
+			)
+			.setDateDoc(
+				ValueManager.getTimestampFromDate(
+					TimeManager.getTimestampFromObject(
+						giftCard.get_Value("DateDoc")
+					)
+				)
+			)
+			.setValidTo(
+				ValueManager.getTimestampFromDate(
+					TimeManager.getTimestampFromObject(
+						giftCard.get_Value("ValidTo")
+					)
+				)
+			)
+			.setOrderId(
+				giftCard.get_ValueAsInt("C_Order_ID")
+			)
+			.setIsProcessed(
+				giftCard.get_ValueAsBoolean("Processed")
+			)
+			.setIsProcessing(
+				giftCard.get_ValueAsBoolean("Processing")
+			)
+			.setAmount(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromString(
+						giftCard.get_ValueAsString("Amount")
+					)
+				)
+			)
+			.setCurrency(
+				CoreFunctionalityConvert.convertCurrency(
+					giftCard.get_ValueAsInt("C_Currency_ID")
+				)
+			)
+			.setConversionTypeId(
+				giftCard.get_ValueAsInt("C_ConversionType_ID")
+			)
+			.setIsPrepayment(
+				giftCard.get_ValueAsBoolean("IsPrepayment")
+			)
+			.setBusinessPartner(
+				CoreFunctionalityConvert.convertBusinessPartner(
+					giftCard.get_ValueAsInt("C_BPartner_ID")
+				)
+			)
+		;
+
+		String whereClause = "ECA14_GiftCard_ID = ?";
+		List<PO> giftCardLines = new Query(
+			giftCard.getCtx(),
+			"ECA14_GiftCardLine",
+			whereClause,
+			giftCard.get_TrxName()
+		)
+			.setParameters(giftCard.get_ID())
+			.list()
+		;
+		giftCardLines.forEach( line -> {
+			builder.addGiftCardLines(
+				convertGiftCardLine(line)
+			);
+		});
+		return builder;
+	}
+
+	/**
+	 * Convert giftCard from entity
+	 * @param giftCardLine
+	 * @return
+	 */
+	public static GiftCardLine.Builder convertGiftCardLine(PO giftCardLine) {
+		GiftCardLine.Builder builder = GiftCardLine.newBuilder();
+		if(giftCardLine == null || giftCardLine.get_ID() <= 0) {
+			return builder;
+		}
+		int orderId = giftCardLine.get_ValueAsInt("C_OrderLine_ID");
+		MOrderLine orderLine = new MOrderLine(Env.getCtx(), orderId, null);
+		MProduct giftProduct = MProduct.get(Env.getCtx(), giftCardLine.get_ValueAsInt("M_Product_ID"));
+		MUOMConversion uom = null;
+		MUOMConversion productUom = null;
+		if (orderLine.getM_Product_ID() > 0) {
+			MProduct product = MProduct.get(Env.getCtx(), orderLine.getM_Product_ID());
+			List<MUOMConversion> productsConversion = Arrays.asList(
+				MUOMConversion.getProductConversions(Env.getCtx(), product.getM_Product_ID())
+			);
+			Optional<MUOMConversion> maybeUom = productsConversion.parallelStream()
+				.filter(productConversion -> {
+					return productConversion.getC_UOM_To_ID() == orderLine.getC_UOM_ID();
+				})
+				.findFirst()
+			;
+			if (maybeUom.isPresent()) {
+				uom = maybeUom.get();
+			}
+
+			Optional<MUOMConversion> maybeProductUom = productsConversion.parallelStream()
+				.filter(productConversion -> {
+					return productConversion.getC_UOM_To_ID() == product.getC_UOM_ID();
+				})
+				.findFirst()
+			;
+			if (maybeProductUom.isPresent()) {
+				productUom = maybeProductUom.get();
+			}
+		} else {
+			uom = new MUOMConversion(Env.getCtx(), 0, null);
+			uom.setC_UOM_ID(orderLine.getC_UOM_ID());
+			uom.setC_UOM_To_ID(orderLine.getC_UOM_ID());
+			uom.setMultiplyRate(Env.ONE);
+			uom.setDivideRate(Env.ONE);
+			productUom = uom;
+		}
+
+		//	Convert
+		return builder
+			.setId(
+				giftCardLine.get_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					giftCardLine.get_ValueAsString("UUID")
+				)
+			).setProduct(
+				CoreFunctionalityConvert.convertProduct(
+					giftProduct
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					giftCardLine.get_ValueAsString("Description")
+				)
+			)
+			.setOrderLineId(
+				giftCardLine.get_ValueAsInt("C_OrderLine_ID")
+			)
+			.setIsProcessed(
+				giftCardLine.get_ValueAsBoolean("Processed")
+			)
+			.setQuantityEntered(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromString(
+						giftCardLine.get_ValueAsString("QtyEntered")
+					)
+				)
+			)
+			.setQuantityOrdered(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromString(
+						giftCardLine.get_ValueAsString("QtyOrdered")
+					)
+				)
+			).setUom(
+				CoreFunctionalityConvert.convertProductConversion(uom)
+			)
+			.setProductUom(
+				CoreFunctionalityConvert.convertProductConversion(productUom)
+			)
+			.setAmount(
+				NumberManager.getBigDecimalToString(
+					NumberManager.getBigDecimalFromString(
+						giftCardLine.get_ValueAsString("Amount")
+					)
+				)
+			)
+			.setGiftCardId(
+				giftCardLine.get_ValueAsInt("ECA14_GiftCard_ID")
+			)
+		;
+	}
+	/**
+	 * Convert Available Order Line
+	 * @param orderLine
+	 * @param availableQty
+	 * @return
+	 */
+	public static AvailableOrderLine.Builder convertAvailableOrderLine(MOrderLine orderLine, BigDecimal availableQty) {
+		AvailableOrderLine.Builder builder = AvailableOrderLine.newBuilder();
+		if(orderLine == null || orderLine.get_ID() <= 0) {
+			return builder;
+		}
+		MProduct product =orderLine.getProduct();
+		MUOMConversion uom = null;
+		MUOMConversion productUom = null;
+		if (orderLine.getM_Product_ID() > 0) {
+			List<MUOMConversion> productsConversion = Arrays.asList(
+					MUOMConversion.getProductConversions(Env.getCtx(), product.getM_Product_ID())
+			);
+			Optional<MUOMConversion> maybeUom = productsConversion.parallelStream()
+					.filter(productConversion -> {
+						return productConversion.getC_UOM_To_ID() == orderLine.getC_UOM_ID();
+					})
+					.findFirst()
+					;
+			if (maybeUom.isPresent()) {
+				uom = maybeUom.get();
+			}
+
+			Optional<MUOMConversion> maybeProductUom = productsConversion.parallelStream()
+					.filter(productConversion -> {
+						return productConversion.getC_UOM_To_ID() == product.getC_UOM_ID();
+					})
+					.findFirst()
+					;
+			if (maybeProductUom.isPresent()) {
+				productUom = maybeProductUom.get();
+			}
+		} else {
+			uom = new MUOMConversion(Env.getCtx(), 0, null);
+			uom.setC_UOM_ID(orderLine.getC_UOM_ID());
+			uom.setC_UOM_To_ID(orderLine.getC_UOM_ID());
+			uom.setMultiplyRate(Env.ONE);
+			uom.setDivideRate(Env.ONE);
+			productUom = uom;
+		}
+
+		//	Convert
+		return builder
+			.setId(
+				orderLine.get_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					orderLine.getUUID()
+				)
+			).setProduct(
+				CoreFunctionalityConvert.convertProduct(
+					product
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					orderLine.getDescription()
+				)
+			)
+			.setAvailableQuantity(
+				NumberManager.getBigDecimalToString(
+					availableQty
+				)
+			)
+			.setPrice(
+				NumberManager.getBigDecimalToString(
+					orderLine.getPriceActual()
+				)
+			)
+			.setUom(
+				CoreFunctionalityConvert.convertProductConversion(uom)
+			)
+			.setProductUom(
+				CoreFunctionalityConvert.convertProductConversion(productUom)
+			)
+			;
 	}
 
 
@@ -169,17 +550,19 @@ public class POSConvertUtil {
 		if (commandShortcut == null) {
 			return builder;
 		}
-		builder.setId(commandShortcut.get_ID())
+		builder.setId(
+				commandShortcut.get_ID()
+			)
 			.setPosId(
 				commandShortcut.get_ValueAsInt(I_C_POS.COLUMNNAME_C_POS_ID)
 			)
 			.setCommand(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					commandShortcut.get_ValueAsString("ECA14_Command")
 				)
 			)
 			.setShortcut(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					commandShortcut.get_ValueAsString("ECA14_Shortcut")
 				)
 			)
@@ -234,11 +617,19 @@ public class POSConvertUtil {
 
 		//	Convert
 		return builder
-			.setOrderLineId(orderLine.getC_OrderLine_ID())
-			.setId(shipmentLine.getM_InOutLine_ID())
-			.setLine(shipmentLine.getLine())
+			.setOrderLineId(
+				orderLine.getC_OrderLine_ID()
+			)
+			.setId(
+				shipmentLine.getM_InOutLine_ID()
+			)
+			.setLine(
+				shipmentLine.getLine()
+			)
 			.setDescription(
-				ValueManager.validateNull(shipmentLine.getDescription())
+				StringManager.getValidString(
+					shipmentLine.getDescription()
+				)
 			)
 			.setProduct(
 				CoreFunctionalityConvert.convertProduct(
@@ -288,14 +679,44 @@ public class POSConvertUtil {
 			return Customer.newBuilder();
 		}
 		Customer.Builder customer = Customer.newBuilder()
-			.setId(businessPartner.getC_BPartner_ID())
-			.setValue(ValueManager.validateNull(businessPartner.getValue()))
-			.setTaxId(ValueManager.validateNull(businessPartner.getTaxID()))
-			.setDuns(ValueManager.validateNull(businessPartner.getDUNS()))
-			.setNaics(ValueManager.validateNull(businessPartner.getNAICS()))
-			.setName(ValueManager.validateNull(businessPartner.getName()))
-			.setLastName(ValueManager.validateNull(businessPartner.getName2()))
-			.setDescription(ValueManager.validateNull(businessPartner.getDescription()))
+			.setId(
+				businessPartner.getC_BPartner_ID()
+			)
+			.setValue(
+				StringManager.getValidString(
+					businessPartner.getValue()
+				)
+			)
+			.setTaxId(
+				StringManager.getValidString(
+					businessPartner.getTaxID()
+				)
+			)
+			.setDuns(
+				StringManager.getValidString(
+					businessPartner.getDUNS()
+				)
+			)
+			.setNaics(
+				StringManager.getValidString(
+					businessPartner.getNAICS()
+				)
+			)
+			.setName(
+				StringManager.getValidString(
+					businessPartner.getName()
+				)
+			)
+			.setLastName(
+				StringManager.getValidString(
+					businessPartner.getName2()
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					businessPartner.getDescription()
+				)
+			)
 		;
 		//	Additional Attributes
 		Struct.Builder customerAdditionalAttributes = Struct.newBuilder();
@@ -346,40 +767,74 @@ public class POSConvertUtil {
 		}
 		MLocation location = businessPartnerLocation.getLocation(true);
 		Address.Builder builder = Address.newBuilder()
-			.setId(businessPartnerLocation.getC_BPartner_Location_ID())
+			.setId(
+				businessPartnerLocation.getC_BPartner_Location_ID()
+			)
 			.setDisplayValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					location.toString()
 				)
 			)
-			.setPostalCode(ValueManager.validateNull(location.getPostal()))
+			.setPostalCode(
+				StringManager.getValidString(
+					location.getPostal()
+				)
+			)
 			.setPostalCodeAdditional(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					location.getPostal_Add()
 				)
 			)
-			.setAddress1(ValueManager.validateNull(location.getAddress1()))
-			.setAddress2(ValueManager.validateNull(location.getAddress2()))
-			.setAddress3(ValueManager.validateNull(location.getAddress3()))
-			.setAddress4(ValueManager.validateNull(location.getAddress4()))
-			.setPostalCode(ValueManager.validateNull(location.getPostal()))
+			.setAddress1(
+				StringManager.getValidString(
+					location.getAddress1()
+				)
+			)
+			.setAddress2(
+				StringManager.getValidString(
+					location.getAddress2()
+				)
+			)
+			.setAddress3(
+				StringManager.getValidString(
+					location.getAddress3()
+				)
+			)
+			.setAddress4(
+				StringManager.getValidString(
+					location.getAddress4()
+				)
+			)
+			.setPostalCode(
+				StringManager.getValidString(
+					location.getPostal()
+				)
+			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getDescription()
 				)
 			)
 			.setLocationName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getName()
 				)
 			)
 			.setContactName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					businessPartnerLocation.getContactPerson()
 				)
 			)
-			.setEmail(ValueManager.validateNull(businessPartnerLocation.getEMail()))
-			.setPhone(ValueManager.validateNull(businessPartnerLocation.getPhone()))
+			.setEmail(
+				StringManager.getValidString(
+					businessPartnerLocation.getEMail()
+				)
+			)
+			.setPhone(
+				StringManager.getValidString(
+					businessPartnerLocation.getPhone()
+				)
+			)
 			.setIsDefaultShipping(
 				businessPartnerLocation.get_ValueAsBoolean(
 					VueStoreFrontUtil.COLUMNNAME_IsDefaultShipping
@@ -412,32 +867,59 @@ public class POSConvertUtil {
 		}
 		//	
 		builder.setPhone(
-			ValueManager.validateNull(
+			StringManager.getValidString(
 				Optional.ofNullable(businessPartnerLocation.getPhone()).orElse(Optional.ofNullable(phone).orElse(""))
 			)
 		);
 		MCountry country = MCountry.get(Env.getCtx(), location.getC_Country_ID());
-		builder.setCountryCode(ValueManager.validateNull(country.getCountryCode()))
-			.setCountryId(country.getC_Country_ID());
+		builder.setCountryCode(
+				StringManager.getValidString(
+					country.getCountryCode()
+				)
+			)
+			.setCountryId(
+				country.getC_Country_ID()
+			)
+		;
 		//	City
 		if(location.getC_City_ID() > 0) {
 			MCity city = MCity.get(Env.getCtx(), location.getC_City_ID());
-			builder.setCity(City.newBuilder()
-				.setId(city.getC_City_ID())
-				.setName(ValueManager.validateNull(city.getName())))
-			;
+			builder.setCity(
+				City.newBuilder()
+					.setId(
+						city.getC_City_ID()
+					)
+					.setName(
+						StringManager.getValidString(
+							city.getName()
+						)
+					)
+			);
 		} else {
-			builder.setCity(City.newBuilder()
-				.setName(ValueManager.validateNull(location.getCity())))
+			builder.setCity(
+				City.newBuilder()
+					.setName(
+						StringManager.getValidString(
+							location.getCity()
+						)
+					)
+				)
 			;
 		}
 		//	Region
 		if(location.getC_Region_ID() > 0) {
 			MRegion region = MRegion.get(Env.getCtx(), location.getC_Region_ID());
-			builder.setRegion(Region.newBuilder()
-				.setId(region.getC_Region_ID())
-				.setName(ValueManager.validateNull(region.getName())))
-			;
+			builder.setRegion(
+				Region.newBuilder()
+					.setId(
+						region.getC_Region_ID()
+					)
+					.setName(
+						StringManager.getValidString(
+							region.getName()
+						)
+					)
+			);
 		}
 		//	Additional Attributes
 		MTable.get(Env.getCtx(), businessPartnerLocation.get_Table_ID()).getColumnsAsList().stream()
@@ -459,6 +941,49 @@ public class POSConvertUtil {
 			builder.setAdditionalAttributes(values);
 		});
 		//	
+		return builder;
+	}
+
+
+	/**
+	 * Convert customer
+	 * @param posCustomerTemplate
+	 * @return
+	 */
+	public static CustomerTemplate.Builder convertCustomerTemplate(PO posCustomerTemplate) {
+		CustomerTemplate.Builder builder = CustomerTemplate.newBuilder();
+		if(posCustomerTemplate == null || posCustomerTemplate.get_ID() <= 0) {
+			return builder;
+		}
+		int businessPartnerId = posCustomerTemplate.get_ValueAsInt(I_C_BPartner.COLUMNNAME_C_BPartner_ID);
+		if(businessPartnerId <= 0) {
+			return builder;
+		}
+		MBPartner businessPartner = MBPartner.get(Env.getCtx(), businessPartnerId);
+		if (businessPartner == null || businessPartner.getC_BPartner_ID() <= 0) {
+			return builder;
+		}
+		builder
+			.setId(
+				businessPartner.getC_BPartner_ID()
+			)
+			.setKey(
+				StringManager.getValidString(
+					businessPartner.getValue()
+				)
+			)
+			.setName(
+				StringManager.getValidString(
+					businessPartner.getDisplayValue()
+				)
+			)
+			.setIsPosRequiredPin(
+				posCustomerTemplate.get_ValueAsBoolean(
+					I_C_POS.COLUMNNAME_IsPOSRequiredPIN
+				)
+			)
+		;
+
 		return builder;
 	}
 

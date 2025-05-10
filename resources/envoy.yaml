@@ -50,6 +50,7 @@ static_resources:
                 - data.Store
                 - dashboarding.Dashboarding
                 - dictionary.Dictionary
+                - display_definition.DisplayDefinition
                 - enrollment.Register
                 - express_movement.ExpressMovement
                 - express_receipt.ExpressReceipt
@@ -62,6 +63,7 @@ static_resources:
                 - field.payment.PaymentInfoService
                 - field.product.ProductInfoService
                 - file_management.FileManagement
+                - form.out_bound_order.OutBoundOrderService
                 - general_ledger.GeneralLedger
                 - import_file_loader.ImportFileLoader
                 - issue_management.IssueManagement
@@ -80,6 +82,7 @@ static_resources:
                 - send_notifications.SendNotifications
                 - store.WebStore
                 - task_management.TaskManagement
+                - ticket_management.TicketManagement
                 - time_control.TimeControl
                 - time_record.TimeRecord
                 - trial_balance_drillable.TrialBalanceDrillable
