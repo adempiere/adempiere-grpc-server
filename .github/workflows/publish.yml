@@ -151,16 +151,24 @@ jobs:
     steps:
       - id: check_docker_hub_secrets_job
         run: |
+          # Debug: Print non-sensitive configurations (mask secrets)
+          echo "--- Debug: Registry/Repo Configuration ---"
+          echo "DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}"
+          echo "DOCKER_REPO: ${{ vars.DOCKER_REPO }}"
+          echo "DOCKER_USERNAME (does secret exist?): $([ -n "${{ secrets.DOCKER_USERNAME }}" ] && echo '***' || echo 'MISSING')"
+          echo "DOCKER_TOKEN (does secret exist?): $([ -n "${{ secrets.DOCKER_TOKEN }}" ] && echo '***' || echo 'MISSING')"
+
           if [[ "${{ vars.DOCKER_REGISTRY }}" != "" && \
                 "${{ vars.DOCKER_REPO }}" != "" && \
                 "${{ secrets.DOCKER_USERNAME }}" != "" && \
                 "${{ secrets.DOCKER_TOKEN }}" != "" ]]; \
           then
-            echo "Secrets to use a container registry are configured in the repo"
+            echo "✅ Secrets to use a container registry are configured in the repo"
             echo "is_have_secrets=true" >> $GITHUB_OUTPUT
           else
-            echo "Secrets to use a container registry were not configured in the repo"
+            echo "❌ Secrets to use a container registry were not configured in the repo"
             echo "is_have_secrets=false" >> $GITHUB_OUTPUT
+            exit 1 
           fi
 
   # TODO: Download .tar and add docker image without uncompress
@@ -192,6 +200,10 @@ jobs:
           registry: ${{ vars.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Debug Tags
+        run: |
+          echo "Pushing ALPINE image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine-${{ github.event.release.tag_name }}"
 
       - name: Push alpine image in Docker Hub
         uses: docker/build-push-action@v6
@@ -238,6 +250,10 @@ jobs:
           registry: ${{ vars.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Debug Tags
+        run: |
+          echo "Pushing MULTI-ARCH image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}"
 
       - name: Push image in Docker Hub
         uses: docker/build-push-action@v6
@@ -283,6 +299,10 @@ jobs:
           registry: ${{ vars.DOCKER_REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Debug Tags
+        run: |
+          echo "Pushing PROXY image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:${{ github.event.release.tag_name }}"
 
       - name: Push image in Docker Hub
         uses: docker/build-push-action@v6
