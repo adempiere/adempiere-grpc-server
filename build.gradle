@@ -25,27 +25,51 @@ def javaMainClass = "org.spin.server.AllInOneServices"
 
 repositories {
 	mavenLocal()
-    mavenCentral()
-    maven {
-    	url = "https://maven.pkg.github.com/Systemhaus-Westfalia/adempiere-shw"
-        credentials {
-        	username = findProperty("deployUsername") ?: System.properties['deploy.user']
-            password = findProperty("deployToken") ?: System.properties['deploy.token'] 
+	mavenCentral()
+	maven {
+		// Systemhaus Westfalia
+		url = "https://maven.pkg.github.com/Systemhaus-Westfalia/adempiere-shw"
+		credentials {
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
 	}
-    // ERP Repos
-    maven {
-    	url = "https://maven.pkg.github.com/erpya/Repository"
-        credentials {
-        	username = findProperty("deployUsername") ?: System.properties['deploy.user']
-            password = findProperty("deployToken") ?: System.properties['deploy.token'] 
+	maven {
+		// ERP Repos
+		url = "https://maven.pkg.github.com/erpya/Repository"
+		credentials {
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
-    }
-    maven {
-    	url = "https://maven.pkg.github.com/adempiere/adempiere"
-        credentials {
-        	username = findProperty("deployUsername") ?: System.properties['deploy.user']
-            password = findProperty("deployToken") ?: System.properties['deploy.token']
+	}
+	maven {
+		// Custom GitHub Repository (ADempiere by Default)
+		url = findProperty("deployRepository") ?: System.properties['deploy.repository'] ?:
+			projectEnv.get("GITHUB_DEPLOY_REPOSITORY", null) ?: System.getenv("GITHUB_DEPLOY_REPOSITORY") ?:
+			"https://maven.pkg.github.com/adempiere/adempiere"
+		credentials {
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
+		}
+	}
+	maven {
+		// Adempiere GitHub Organization
+		url = "https://maven.pkg.github.com/adempiere/adempiere"
+		credentials {
+			// project property, system property, .env project file, system enviroment variable
+			username = findProperty("deployUsername") ?: System.properties['deploy.user'] ?:
+				projectEnv.get("GITHUB_DEPLOY_USER", null) ?: System.getenv("GITHUB_DEPLOY_USER")
+			password = findProperty("deployToken") ?: System.properties['deploy.token'] ?:
+				projectEnv.get("GITHUB_DEPLOY_TOKEN", null) ?: System.getenv("GITHUB_DEPLOY_TOKEN")
 		}
 	}
 }

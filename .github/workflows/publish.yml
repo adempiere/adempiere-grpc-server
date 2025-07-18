@@ -27,6 +27,11 @@ jobs:
           java-version: 17
           architecture: x64
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: current # 8.0.2
+
       - name: Set Main Version
         run: echo "MAIN_VERSION=${{ github.event.release.name }}" >> src/main/java/org/spin/base/version.properties
 
@@ -41,6 +46,10 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
           ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
+          ORG_GRADLE_PROJECT_deplyRepository: ${{ secrets.DEPLOY_REPOSITORY }}
+          GITHUB_DEPLOY_USER: ${{ github.actor }}
+          GITHUB_DEPLOY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_DEPLOY_REPOSITORY: ${{ secrets.DEPLOY_REPOSITORY }}
 
       - name: Upload descriptor file artifact
         uses: actions/upload-artifact@v4
