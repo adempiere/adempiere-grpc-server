@@ -92,6 +92,7 @@ dependencies {
 	implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
     implementation 'javax.activation:activation:1.1.1'
 
+	/*
 	//	ADempiere Core
 	implementation "${baseGroupId}:base:${baseVersion}"
 	implementation "${baseGroupId}:point-of-sales:${baseVersion}"
@@ -119,6 +120,7 @@ dependencies {
 	implementation "${baseGroupId}:telegram-notifier:${baseVersion}"
 	implementation "${baseGroupId}:tools:${baseVersion}"
 	implementation "${baseGroupId}:jasperreports:${baseVersion}"
+	*/
 
 	//	Others
 	compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
