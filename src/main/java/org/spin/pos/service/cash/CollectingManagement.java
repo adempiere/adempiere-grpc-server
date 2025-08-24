@@ -253,7 +253,10 @@ public class CollectingManagement {
 		}
 		*/
 		if(paymentTypeAllocation.get_ValueAsInt("C_CardProvider_ID") > 0) {
-			payment.setC_CardProvider_ID(paymentTypeAllocation.get_ValueAsInt("C_CardProvider_ID"));
+			payment.set_ValueOfColumn(
+				"C_CardProvider_ID",
+				paymentTypeAllocation.get_ValueAsInt("C_CardProvider_ID")
+			);
 		}
 		payment.saveEx(transactionName);
 		return payment;
