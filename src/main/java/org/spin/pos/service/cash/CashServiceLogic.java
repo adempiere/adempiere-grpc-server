@@ -31,8 +31,10 @@ import org.adempiere.core.domains.models.I_AD_Process;
 import org.adempiere.core.domains.models.I_C_Payment;
 import org.adempiere.core.domains.models.X_C_Payment;
 import org.adempiere.exceptions.AdempiereException;
+/*
 import org.compiere.interfaces.PaymentProcessorClosing;
 import org.compiere.interfaces.PaymentProcessorStatus;
+*/
 import org.compiere.model.MBankAccount;
 import org.compiere.model.MBankStatement;
 import org.compiere.model.MPOS;
@@ -635,6 +637,7 @@ public class CashServiceLogic {
 			PO paymentProcessorRun = null;
 			try {
 				PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
+				/*
 				if (PaymentProcessorClosing.class.isAssignableFrom(processor.getClass())) {
 					((PaymentProcessorClosing) processor).closeBatch(paymentMethodId, bankStatement.getStatementDate());
 					whereClause = "C_BankStatement_ID = ? AND C_PaymentMethod_ID = ?";
@@ -646,6 +649,7 @@ public class CashServiceLogic {
 				} else {
 					throw new AdempiereException(PaymentProcessorClosing.class.getName() + "Unsupported");
 				}
+				*/
 			} catch (Exception e) {
 				throw new AdempiereException(e.getLocalizedMessage());
 			}
@@ -702,6 +706,7 @@ public class CashServiceLogic {
 			}
 			PO paymentProcessorRun = null;
 			PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
+			/*
 			if (PaymentProcessorStatus.class.isAssignableFrom(processor.getClass())) {
 				((PaymentProcessorStatus) processor).transactionStatus();
 				whereClause = "C_BankStatement_ID = ? AND C_PaymentMethod_ID = ?";
@@ -713,6 +718,7 @@ public class CashServiceLogic {
 			} else {
 				throw new AdempiereException(PaymentProcessorClosing.class.getName() + "Unsupported");
 			}
+			*/
 			String	message = paymentProcessorRun.get_ValueAsString("ResponseMessage");
 			String	status = paymentProcessorRun.get_ValueAsString("ResponseStatus");
 
