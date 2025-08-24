@@ -59,7 +59,9 @@ import org.compiere.util.Msg;
 import org.compiere.util.TimeUtil;
 import org.compiere.util.Trx;
 import org.compiere.util.Util;
+/*
 import org.solop.sp032.util.CurrencyConvertDocumentsUtil;
+*/
 import org.spin.base.util.ReferenceInfo;
 import org.spin.grpc.service.field.field_management.FieldManagementLogic;
 import org.spin.service.grpc.util.value.BooleanManager;
@@ -381,7 +383,10 @@ public class PaymentAllocationLogic {
 				request.getDate()
 			);
 			final Timestamp dateFrom = TimeUtil.getDay(date); // Remove time mark
+			/*
 			final Timestamp dateTo = TimeUtil.addYears(dateFrom, CurrencyConvertDocumentsUtil.TIME_Interval);
+			*/
+			final Timestamp dateTo = TimeUtil.addYears(dateFrom, 100);
 
 			final int clientId = Env.getAD_Client_ID(Env.getCtx());
 			final int organizationId = organization.getAD_Org_ID();

@@ -61,8 +61,10 @@ import org.compiere.util.Env;
 import org.compiere.util.TimeUtil;
 import org.compiere.util.Trx;
 import org.compiere.util.Util;
+/*
 import org.solop.sp032.model.MSP032Conversion;
 import org.solop.sp032.util.CurrencyConvertDocumentsUtil;
+*/
 import org.spin.backend.grpc.common.ListLookupItemsResponse;
 import org.spin.backend.grpc.common.LookupItem;
 import org.spin.backend.grpc.general_ledger.AccountingDocument;
@@ -567,7 +569,10 @@ public class GeneralLedgerServiceLogic {
 						);
 						documentNo = expedient.get_ValueAsString(I_C_Order.COLUMNNAME_DocumentNo);
 						dateFrom = TimeManager.getTimestampFromObject(
+							/*
 							expedient.get_Value(MSP032Conversion.COLUMNNAME_DateDoc)
+							*/
+							expedient.get_Value("DateDoc")
 						);
 					}
 				}
@@ -591,7 +596,10 @@ public class GeneralLedgerServiceLogic {
 					MConversionType conversionTypeBase = new MConversionType(Env.getCtx(), request.getConversionTypeId(), transactionName);
 					PO.copyValues(conversionTypeBase, conversionType);
 					conversionType.set_CustomColumn(
+						/*
 						CurrencyConvertDocumentsUtil.COLUMNNAME_SP032_ParentCType_ID,
+						*/
+						"SP032_ParentCType_ID",
 						request.getConversionTypeId()
 					);
 				}
@@ -616,7 +624,10 @@ public class GeneralLedgerServiceLogic {
 				} else if (request.getAssetAdditionId() > 0) {
 					conversionType.set_CustomColumn(I_A_Asset_Addition.COLUMNNAME_A_Asset_Addition_ID, request.getAssetAdditionId());
 				} else if (request.getExpedientId() > 0) {
+					/*
 					conversionType.set_CustomColumn(CurrencyConvertDocumentsUtil.ColumnName_SP009_Expedient_ID, request.getExpedientId());
+					*/
+					conversionType.set_CustomColumn("SP009_Expedient_ID", request.getExpedientId());
 				}
 				conversionType.saveEx();
 			}
@@ -627,7 +638,10 @@ public class GeneralLedgerServiceLogic {
 				);
 				dateFrom = TimeUtil.getDay(date); // Remove time mark
 			}
+			/*
 			final Timestamp dateTo = TimeUtil.addYears(dateFrom, CurrencyConvertDocumentsUtil.TIME_Interval);
+			*/
+			final Timestamp dateTo = TimeUtil.addYears(dateFrom, 100);
 
 			final int clientId = Env.getAD_Client_ID(Env.getCtx());
 			final int organizationId = organization.getAD_Org_ID();

@@ -28,7 +28,9 @@ import org.compiere.model.MTable;
 import org.compiere.model.Query;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
+/*
 import org.solop.sp032.util.CurrencyConvertDocumentsUtil;
+*/
 import org.spin.backend.grpc.general_ledger.AccountingDocument;
 import org.spin.backend.grpc.general_ledger.ConversionRate;
 import org.spin.backend.grpc.general_ledger.ConversionType;
@@ -143,7 +145,10 @@ public class GeneralLedgerConvertUtil {
 			)
 			.setParentId(
 				conversionType.get_ValueAsInt(
+					/*
 					CurrencyConvertDocumentsUtil.COLUMNNAME_SP032_ParentCType_ID
+					*/
+					"SP032_ParentCType_ID"
 				)
 			)
 			.setBusinessPartnerId(
@@ -173,7 +178,10 @@ public class GeneralLedgerConvertUtil {
 			)
 			.setExpedientId(
 				conversionType.get_ValueAsInt(
+					/*
 					CurrencyConvertDocumentsUtil.ColumnName_SP009_Expedient_ID
+					*/
+					"SP009_Expedient_ID"
 				)
 			)
 		;
