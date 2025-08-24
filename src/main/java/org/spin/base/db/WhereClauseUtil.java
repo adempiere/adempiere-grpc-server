@@ -37,6 +37,7 @@ import org.compiere.model.MColumn;
 import org.compiere.model.MTab;
 import org.compiere.model.MTable;
 import org.compiere.model.MWindow;
+import org.compiere.util.CLogger;
 import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
@@ -54,6 +55,9 @@ import org.spin.service.grpc.util.value.StringManager;
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
  */
 public class WhereClauseUtil {
+
+	/**	Logger			*/
+	private static CLogger log = CLogger.getCLogger(WhereClauseUtil.class);
 
 
 	/**
@@ -295,8 +299,8 @@ public class WhereClauseUtil {
 			if (condition.getValues() != null) {
 				condition.getValues().forEach(currentValue -> {
 					boolean isString = DisplayType.isText(displayType) || currentValue instanceof String;
-
-					if (currentValue == null || (isString && Util.isEmpty((String) currentValue, true))) {
+					boolean isEmptyString = isString && Util.isEmpty(StringManager.getStringFromObject(currentValue), true);
+					if (currentValue == null || isEmptyString) {
 						if (Util.isEmpty(additionalSQL.toString(), true)) {
 							additionalSQL.append("(SELECT " + baseColumnName + " WHERE " + baseColumnName + " IS NULL)");
 						}
@@ -383,8 +387,8 @@ public class WhereClauseUtil {
 			Object parameterValue = condition.getValue();
 			sqlValue = " ? ";
 
-			boolean isString = DisplayType.isText(displayType);
-			boolean isEmptyString = isString && Util.isEmpty((String) parameterValue, true);
+			boolean isString = DisplayType.isText(displayType) || parameterValue instanceof String;
+			boolean isEmptyString = isString && Util.isEmpty(StringManager.getStringFromObject(parameterValue), true);
 			if (isString) {
 				if (isEmptyString) {
 					parameterValue = "";
@@ -463,8 +467,8 @@ public class WhereClauseUtil {
 
 			condition.getValues().forEach(currentValue -> {
 				boolean isString = DisplayType.isText(displayType) || currentValue instanceof String;
-
-				if (currentValue == null || (isString && Util.isEmpty((String) currentValue, true))) {
+				boolean isEmptyString = isString && Util.isEmpty(StringManager.getStringFromObject(currentValue), true);
+				if (currentValue == null || isEmptyString) {
 					if (Util.isEmpty(additionalSQL.toString(), true)) {
 						additionalSQL.append("(SELECT " + baseColumnName + " WHERE " + baseColumnName + " IS NULL)");
 					}
@@ -554,7 +558,7 @@ public class WhereClauseUtil {
 			sqlValue = dbValue;
 
 			boolean isString = DisplayType.isText(displayType) || valueToFilter instanceof String;
-			boolean isEmptyString = isString && Util.isEmpty((String) valueToFilter, true);
+			boolean isEmptyString = isString && Util.isEmpty(StringManager.getStringFromObject(valueToFilter), true);
 			if (isString) {
 				if (isEmptyString) {
 					valueToFilter = "";
@@ -585,6 +589,7 @@ public class WhereClauseUtil {
 
 		return rescriction;
 	}
+
 
 
 	/**
@@ -691,8 +696,8 @@ public class WhereClauseUtil {
 		if (tabs == null) {
 			MWindow window = MWindow.get(tab.getCtx(), tab.getAD_Window_ID());
 			tabs = Arrays.asList(
-					window.getTabs(false, null)
-				)
+				window.getTabs(false, null)
+			)
 				.stream()
 				.filter(currentTab -> {
 					return currentTab.isActive();
@@ -720,13 +725,18 @@ public class WhereClauseUtil {
 			MTable mainTable = null;
 			if(optionalTab.isPresent()) {
 				mainTable = MTable.get(context, optionalTab.get().getAD_Table_ID());
-				mainColumnName = mainTable.getKeyColumns()[0];
+				String[] keyColumns = mainTable.getKeyColumns();
+				if (keyColumns.length > 0) {
+					// get first
+					mainColumnName = keyColumns[0];
+				}
 			}
 
 			List<MTab> parentTabsList = WindowUtil.getParentTabsList(tab.getAD_Window_ID(), tabId, new ArrayList<MTab>());
 			List<MTab> tabList = parentTabsList.stream()
 				.filter(parentTab -> {
-					return parentTab.getAD_Tab_ID() != tabId
+					return parentTab.isActive()
+						&& parentTab.getAD_Tab_ID() != tabId
 						&& parentTab.getAD_Tab_ID() != optionalTab.get().getAD_Tab_ID()
 						&& parentTab.getSeqNo() < seqNo
 						&& parentTab.getTabLevel() < tabLevel
@@ -838,12 +848,22 @@ public class WhereClauseUtil {
 		return where.toString();
 	}
 
+
+
 	public static String getWhereClauseFromKeyColumns(String[] keyColumns) {
+		String whereClause = getWhereClauseFromKeyColumns(null, keyColumns);
+
+		return whereClause;
+	}
+	public static String getWhereClauseFromKeyColumns(String tableAlias, String[] keyColumns) {
 		String whereClause = "";
 		if (keyColumns != null && keyColumns.length > 0) {
 			for (String columnName: keyColumns) {
 				if (!Util.isEmpty(whereClause, true)) {
 					whereClause += " AND ";
+				}
+				if (!Util.isEmpty(tableAlias, true)) {
+					whereClause += tableAlias + ".";
 				}
 				whereClause += columnName + " = ? ";
 			}
@@ -851,6 +871,8 @@ public class WhereClauseUtil {
 
 		return whereClause;
 	}
+
+
 
 	/**
 	 * Get Where clause for Smart Browse by Criteria Conditions
@@ -889,9 +911,9 @@ public class WhereClauseUtil {
 		// TODO: Add 1=1 to remove `if (whereClause.length() > 0)` and change stream with parallelStream
 		StringBuffer whereClause = new StringBuffer();
 		List<Filter> conditions = FilterManager.newInstance(filters).getConditions();
-//		if (!Util.isEmpty(filters.getWhereClause(), true)) {
-//			whereClause.append("(").append(filters.getWhereClause()).append(")");
-//		}
+		// if (!Util.isEmpty(filters.getWhereClause(), true)) {
+		// 	whereClause.append("(").append(filters.getWhereClause()).append(")");
+		// }
 		if (conditions == null || conditions.size() == 0) {
 			return whereClause.toString();
 		}
@@ -900,7 +922,16 @@ public class WhereClauseUtil {
 		List<MBrowseField> browseFieldsList = browser.getFields();
 		HashMap<String, MBrowseField> browseFields = new HashMap<>();
 		for (MBrowseField browseField : browseFieldsList) {
-			browseFields.put(browseField.getAD_View_Column().getColumnName(), browseField);
+			String viewColumnName = browseField.getAD_View_Column().getColumnName();
+			if (browseFields.containsKey(viewColumnName)) {
+				MBrowseField existsBrowseField = browseFields.get(viewColumnName);
+				log.warning(
+					"@ColumnName@: " + viewColumnName + ", @AlreadyExists@. @AD_Browse_Field@ "
+					+ existsBrowseField.getName() + " (ID: " + existsBrowseField.getAD_Browse_Field_ID() + ") / "
+					+ browseField.getName() + " (ID: " + browseField.getAD_Browse_Field_ID() + ")"
+				);
+			}
+			browseFields.put(viewColumnName, browseField);
 		}
 		HashMap<String, String> rangeAdd = new HashMap<>();
 		conditions.stream()
@@ -925,6 +956,7 @@ public class WhereClauseUtil {
 				if (whereClause.length() > 0) {
 					whereClause.append(" AND ");
 				}
+
 				String restriction = WhereClauseUtil.getRestrictionByOperator(
 					condition,
 					browseField.getAD_Reference_ID(),
@@ -976,9 +1008,9 @@ public class WhereClauseUtil {
 		// TODO: Add 1=1 to remove `if (whereClause.length() > 0)` and change stream with parallelStream
 		StringBuffer whereClause = new StringBuffer();
 		List<Filter> conditions = FilterManager.newInstance(filters).getConditions();
-//		if (!Util.isEmpty(filters.getWhereClause(), true)) {
-//			whereClause.append("(").append(filters.getWhereClause()).append(")");
-//		}
+		// if (!Util.isEmpty(filters.getWhereClause(), true)) {
+		// 	whereClause.append("(").append(filters.getWhereClause()).append(")");
+		// }
 		if (conditions == null || conditions.size() == 0) {
 			return whereClause.toString();
 		}
@@ -986,6 +1018,15 @@ public class WhereClauseUtil {
 		List<MViewColumn> viewColumnsList = view.getViewColumns();
 		HashMap<String, MViewColumn> viewColummns = new HashMap<>();
 		for (MViewColumn viewColumn : viewColumnsList) {
+			String viewColumnName = viewColumn.getColumnName();
+			if (viewColummns.containsKey(viewColumnName)) {
+				MViewColumn existsViewColumn = viewColummns.get(viewColumnName);
+				log.warning(
+					"@ColumnName@: " + viewColumnName + ", @AlreadyExists@. @AD_Browse_Field@ "
+					+ existsViewColumn.getName() + " (ID: " + existsViewColumn.getAD_View_Column_ID() + ") / "
+					+ viewColumn.getName() + " (ID: " + viewColumn.getAD_View_Column_ID() + ")"
+				);
+			}
 			viewColummns.put(viewColumn.getColumnName(), viewColumn);
 		}
 

@@ -44,6 +44,7 @@ import org.compiere.util.Env;
 import org.compiere.util.TimeUtil;
 import org.spin.base.util.RecordUtil;
 import org.spin.pos.util.ColumnsAdded;
+import org.spin.service.grpc.util.value.NumberManager;
 
 /**
  * A util class for change values for documents
@@ -57,7 +58,7 @@ public class OrderUtil {
 		}
 		MOrder order = new MOrder(Env.getCtx(), orderId, null);
 		if (order == null || order.getC_Order_ID() <= 0) {
-			throw new AdempiereException("@C_Order_ID@ @NotFound@");
+			throw new AdempiereException("@C_Order_ID@ (" + orderId + ") @NotFound@");
 		}
 		return order;
 	}
@@ -100,7 +101,7 @@ public class OrderUtil {
 			.collect(Collectors.toList());
 	}
 
-	public static Optional<BigDecimal> getPaymentChageOrCredit(MOrder order, boolean isCredit) {
+	public static Optional<BigDecimal> getPaymentChargeOrCredit(MOrder order, boolean isCredit) {
 		return getPaymentReferencesList(order)
 			.stream()
 			.filter(paymentReference -> {
@@ -108,9 +109,9 @@ public class OrderUtil {
 			})
 			.map(paymentReference -> {
 				BigDecimal amount = ((BigDecimal) paymentReference.get_Value("Amount"));
-				return getConvetedAmount(order, paymentReference, amount);
+				return getConvertedAmount(order, paymentReference, amount);
 			})
-			.collect(Collectors.reducing(BigDecimal::add));
+			.reduce(BigDecimal::add);
 	}
 
 	/**
@@ -243,7 +244,7 @@ public class OrderUtil {
 	 * @return
 	 * @return BigDecimal
 	 */
-	public static BigDecimal getConvetedAmount(MOrder order, PO payment, BigDecimal amount) {
+	public static BigDecimal getConvertedAmount(MOrder order, PO payment, BigDecimal amount) {
 		if(payment.get_ValueAsInt("C_Currency_ID") == order.getC_Currency_ID()
 				|| amount == null
 				|| amount.compareTo(Env.ZERO) == 0) {
@@ -261,7 +262,7 @@ public class OrderUtil {
 	 * @return
 	 * @return BigDecimal
 	 */
-	public static BigDecimal getConvetedAmount(MOrder order, MPayment payment, BigDecimal amount) {
+	public static BigDecimal getConvertedAmount(MOrder order, MPayment payment, BigDecimal amount) {
 		if(payment.getC_Currency_ID() == order.getC_Currency_ID()
 				|| amount == null
 				|| amount.compareTo(Env.ZERO) == 0) {
@@ -283,7 +284,7 @@ public class OrderUtil {
 	 * @return
 	 * @return BigDecimal
 	 */
-	public static BigDecimal getConvetedAmount(MPOS pos, MPayment payment, BigDecimal amount) {
+	public static BigDecimal getConvertedAmount(MPOS pos, MPayment payment, BigDecimal amount) {
 		int toCurrencyId = pos.getM_PriceList().getC_Currency_ID();
 		if(payment.getC_Currency_ID() == toCurrencyId
 				|| amount == null
@@ -425,18 +426,14 @@ public class OrderUtil {
     		.setClient_ID()
     		.getIDsAsList()
     		.forEach(sourceRmaLineId -> {
-    			MOrderLine sourcerRmaLine = new MOrderLine(sourceRma.getCtx(), sourceRmaLineId, transactionName);
+    			MOrderLine sourceRmaLine = new MOrderLine(sourceRma.getCtx(), sourceRmaLineId, transactionName);
 				//	Create new Invoice Line
-				MOrderLine targetOrderLine = copyOrderLine(sourcerRmaLine, targetOrder, true, transactionName);
-				targetOrderLine.set_ValueOfColumn(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID, sourcerRmaLine.getC_OrderLine_ID());
-				BigDecimal availableQuantity = getAvailableQuantityForSell(sourcerRmaLine.getC_OrderLine_ID(), sourcerRmaLine.getQtyEntered(), targetOrderLine.getQtyEntered());
+				MOrderLine targetOrderLine = copyOrderLine(sourceRmaLine, targetOrder, true, transactionName);
+				targetOrderLine.set_ValueOfColumn(ColumnsAdded.COLUMNNAME_ECA14_Source_RMALine_ID, sourceRmaLine.getC_OrderLine_ID());
+				BigDecimal availableQuantity = getAvailableQuantityForSell(sourceRmaLine.getC_OrderLine_ID(), sourceRmaLine.getQtyEntered(), targetOrderLine.getQtyEntered());
 				if(availableQuantity.compareTo(Env.ZERO) > 0) {
 					OrderUtil.updateUomAndQuantity(targetOrderLine, targetOrderLine.getC_UOM_ID(), availableQuantity);
     			}
-				//	Just copy available
-//				else {
-//    				throw new AdempiereException("@QtyInsufficient@");
-//    			}
     		});
     }
     
@@ -481,7 +478,7 @@ public class OrderUtil {
 		int standardPrecision = priceList.getStandardPrecision();
 
 		BigDecimal creditAmt = BigDecimal.ZERO.setScale(standardPrecision, RoundingMode.HALF_UP);
-		Optional<BigDecimal> maybeCreditAmt = getPaymentChageOrCredit(order, true);
+		Optional<BigDecimal> maybeCreditAmt = getPaymentChargeOrCredit(order, true);
 		if (maybeCreditAmt.isPresent()) {
 			creditAmt = maybeCreditAmt.get()
 				.setScale(standardPrecision, RoundingMode.HALF_UP);
@@ -497,7 +494,7 @@ public class OrderUtil {
 		int standardPrecision = priceList.getStandardPrecision();
 
 		BigDecimal chargeAmt = BigDecimal.ZERO.setScale(standardPrecision, RoundingMode.HALF_UP);
-		Optional<BigDecimal> maybeChargeAmt = getPaymentChageOrCredit(order, false);
+		Optional<BigDecimal> maybeChargeAmt = getPaymentChargeOrCredit(order, false);
 		if (maybeChargeAmt.isPresent()) {
 			chargeAmt = maybeChargeAmt.get()
 				.setScale(standardPrecision, RoundingMode.HALF_UP);
@@ -569,18 +566,22 @@ public class OrderUtil {
 			if(!payment.isReceipt()) {
 				paymentAmount = payment.getPayAmt().negate();
 			}
-			return getConvetedAmount(order, payment, paymentAmount);
-		}).collect(Collectors.reducing(BigDecimal::add));
+			return getConvertedAmount(order, payment, paymentAmount);
+		}).reduce(BigDecimal::add);
 
 		List<PO> paymentReferencesList = getPaymentReferencesList(order);
 		Optional<BigDecimal> paymentReferenceAmount = paymentReferencesList.stream()
-				.map(paymentReference -> {
-			BigDecimal amount = ((BigDecimal) paymentReference.get_Value("Amount"));
-			if(paymentReference.get_ValueAsBoolean("IsReceipt")) {
-				amount = amount.negate();
-			}
-			return getConvetedAmount(order, paymentReference, amount);
-		}).collect(Collectors.reducing(BigDecimal::add));
+			.map(paymentReference -> {
+				BigDecimal amount = NumberManager.getBigDecimalFromObject(
+					paymentReference.get_Value("Amount")
+				); //((BigDecimal) paymentReference.get_Value("Amount"));
+				if(paymentReference.get_ValueAsBoolean("IsReceipt")) {
+					amount = amount.negate();
+				}
+                return getConvertedAmount(order, paymentReference, amount);
+			})
+			.reduce(BigDecimal::add)
+		;
 
 		BigDecimal paymentAmount = Env.ZERO;
 		if(paidAmount.isPresent()) {
@@ -590,6 +591,11 @@ public class OrderUtil {
 		if(paymentReferenceAmount.isPresent()) {
 			totalPaymentAmount = totalPaymentAmount.subtract(paymentReferenceAmount.get());
 		}
+
+		// final boolean isReturnOrder = order.isReturnOrder();
+		// if (isReturnOrder) {
+		// 	totalPaymentAmount = totalPaymentAmount.negate();
+		// }
 
 		return totalPaymentAmount;
 	}

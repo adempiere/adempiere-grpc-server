@@ -29,6 +29,7 @@ import org.adempiere.core.domains.models.I_AD_Reference;
 import org.adempiere.core.domains.models.I_C_Location;
 import org.adempiere.core.domains.models.I_C_ValidCombination;
 import org.adempiere.core.domains.models.I_M_AttributeSetInstance;
+import org.adempiere.core.domains.models.I_M_Locator;
 import org.compiere.model.MColumn;
 import org.compiere.model.MCountry;
 import org.compiere.model.MLookupFactory;
@@ -41,6 +42,7 @@ import org.compiere.util.Env;
 import org.compiere.util.Language;
 import org.compiere.util.Util;
 import org.spin.dictionary.util.DictionaryUtil;
+import org.spin.grpc.service.accounting.AccountingUtils;
 import org.spin.util.AttachmentUtil;
 
 
@@ -133,9 +135,30 @@ public class ReferenceUtil {
 	 * @param referenceValueId
 	 * @param columnName
 	 * @param language
+	 * @param tableName
 	 * @return
 	 */
 	public ReferenceInfo getReferenceInfo(int referenceId, int referenceValueId, String columnName, String language, String tableName) {
+		return getReferenceInfo(
+			referenceId,
+			referenceValueId,
+			columnName,
+			null,
+			language,
+			tableName
+		);
+	}
+	/**
+	 * Get Reference information, can return null if reference is invalid or not exists
+	 * @param referenceId
+	 * @param referenceValueId
+	 * @param columnName
+	 * @param columnAlias
+	 * @param language
+	 * @param tableName
+	 * @return
+	 */
+	public ReferenceInfo getReferenceInfo(int referenceId, int referenceValueId, String columnName, String columnAlias, String language, String tableName) {
 		if(!validateReference(referenceId)) {
 			return null;
 		}
@@ -150,6 +173,7 @@ public class ReferenceUtil {
 		// new instance generated
 		referenceInfo = new ReferenceInfo();
 		referenceInfo.setColumnName(columnName);
+		referenceInfo.setColumnAlias(columnAlias);
 
 		if (DisplayType.ID == referenceId) {
 			MTable table = MTable.get(context, tableName);
@@ -158,7 +182,7 @@ public class ReferenceUtil {
 			}
 			String[] keyColumns = table.getKeyColumns();
 			if (keyColumns == null || keyColumns.length > 1) {
-				// traslated or accouting table
+				// traslated or accounting table
 				return null;
 			}
 
@@ -223,6 +247,12 @@ public class ReferenceUtil {
 			final String displaColumn = getDisplayColumnSQLLocation(tableName, columnName);
 			referenceInfo.setDisplayColumnValue("(" + displaColumn + ")");
 			referenceInfo.setHasJoinValue(false);
+		} else if (DisplayType.Locator == referenceId) {
+			//	Add Display
+			referenceInfo.setTableName(I_M_Locator.Table_Name);
+			referenceInfo.setDisplayColumnValue(I_M_Locator.COLUMNNAME_Value);
+			referenceInfo.setTableAlias(I_M_Locator.Table_Name + "_" + columnName);
+			referenceInfo.setJoinColumnName(I_M_Locator.COLUMNNAME_M_Locator_ID);
 		} else if((DisplayType.TableDir == referenceId || (DisplayType.Table == referenceId || DisplayType.Search == referenceId)
 			&& columnName.endsWith("_ID")) && referenceValueId <= 0) {
 			//	Add Display
@@ -242,29 +272,33 @@ public class ReferenceUtil {
 				return null;
 			}
 
-			String displayColumn = "";
-			if (!Util.isEmpty(lookupInfo.DisplayColumn, true)) {
-				displayColumn = (lookupInfo.DisplayColumn).replace(lookupInfo.TableName + ".", "");
-			} else {
+			String displayColumn = lookupInfo.DisplayColumn;
+			if (Util.isEmpty(displayColumn, true)) {
 				// Parent recursive columns
 				displayColumn = "(" + MLookupFactory.getLookup_TableEmbed(languageValue, columnName, tableName, referenceValueId) + ")";
 				referenceInfo.setDisplayColumnValue(displayColumn);
 				referenceInfo.setHasJoinValue(false);
 				return referenceInfo;
 			}
-			if (!Util.isEmpty(displayColumn)) {
+
+			displayColumn = (lookupInfo.DisplayColumn).replace(lookupInfo.TableName + ".", "");
+			if (!Util.isEmpty(displayColumn, true)) {
 				referenceInfo.setDisplayColumnValue(displayColumn);
 			}
+	
 			referenceInfo.setJoinColumnName((lookupInfo.KeyColumn == null ? "" : lookupInfo.KeyColumn).replace(lookupInfo.TableName + ".", ""));
 			referenceInfo.setTableName(lookupInfo.TableName);
-			if(DisplayType.List == referenceId
-					&& referenceValueId != 0) {
+			// TODO: Validate if it is a `Table` with reference value key, to remove the `List` from the condition
+			if(DisplayType.List == referenceId && referenceValueId > 0) {
 				referenceInfo.setReferenceId(referenceValueId);
 			}
 			//	Translate
 			if (!Util.isEmpty(displayColumn, true) && MTable.hasTranslation(lookupInfo.TableName)) {
 				// display column exists on translation table
-				int columnId = MColumn.getColumn_ID(lookupInfo.TableName + DictionaryUtil.TRANSLATION_SUFFIX, displayColumn);
+				int columnId = MColumn.getColumn_ID(
+					lookupInfo.TableName + DictionaryUtil.TRANSLATION_SUFFIX,
+					displayColumn
+				);
 				if (columnId > 0) {
 					referenceInfo.setLanguage(language);
 				}
@@ -480,6 +514,15 @@ public class ReferenceUtil {
 				+ "FROM M_AttributeSetInstance ";
 			lookupInformation.QueryDirect = lookupInformation.Query
 				+ "WHERE M_AttributeSetInstance.M_AttributeSetInstance_ID = ? ";
+		} else if (DisplayType.Locator == referenceId) {
+			columnName = I_M_Locator.COLUMNNAME_M_Locator_ID;
+			lookupInformation = getLookupInfoFromColumnName(columnName);
+			lookupInformation.DisplayType = referenceId;
+			lookupInformation.Query = "SELECTM_Locator.M_Locator_ID, "
+				+ "NULL, M_Locator.Value, M_Locatore.IsActive "
+				+ "FROM M_Locator ";
+			lookupInformation.QueryDirect = lookupInformation.Query
+				+ "WHERE M_Locator.M_Locator_ID = ? ";
 		} else if(DisplayType.Image == referenceId) {
 			columnName = I_AD_Image.COLUMNNAME_AD_Image_ID;
 			lookupInformation = getLookupInfoFromColumnName(columnName);
@@ -488,6 +531,13 @@ public class ReferenceUtil {
 			lookupInformation.QueryDirect = getDirectQueryColumnSQLImage();
 		} else if(DisplayType.TableDir == referenceId
 				|| referenceValueId <= 0) {
+			// TODO: Add support on MLookupInfo to reuse on Zk/Swing
+			if (AccountingUtils.USER_ELEMENT_COLUMNS.contains(columnName)) {
+				String newColumnName = AccountingUtils.overwriteColumnName(columnName);
+				if (!Util.isEmpty(newColumnName, true)) {
+					columnName = newColumnName;
+				}
+			}
 			//	Add Display
 			lookupInformation = getLookupInfoFromColumnName(columnName);
 		} else {

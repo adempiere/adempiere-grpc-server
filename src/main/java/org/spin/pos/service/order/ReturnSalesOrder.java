@@ -82,10 +82,10 @@ public class ReturnSalesOrder {
 				targetOrder.setDescription(description);
 			}
 			targetOrder.saveEx();
-	    	if(copyLines) {
-	    		RMAUtil.copyRMALinesFromOrder(sourceOrder, targetOrder, transactionName);
-	    	}
-	    	orderReference.set(targetOrder);
+			if(copyLines) {
+				RMAUtil.copyRMALinesFromOrder(sourceOrder, targetOrder, transactionName);
+			}
+			orderReference.set(targetOrder);
 		});
 		return orderReference.get();
 	}
@@ -172,7 +172,7 @@ public class ReturnSalesOrder {
 			} else {
 				if(availableQuantity.compareTo(Env.ZERO) > 0) {
 		        	MOrderLine rmaLine = RMAUtil.copyRMALineFromOrder(rma, sourcerOrderLine, transactionName);
-		        	Optional.ofNullable(descrption).ifPresent(description -> rmaLine.setDescription(description));
+		        	Optional.ofNullable(descrption).ifPresent(rmaLine::setDescription);
 		        	OrderUtil.updateUomAndQuantity(rmaLine, rmaLine.getC_UOM_ID(), availableQuantity);
 		        	returnOrderReference.set(rmaLine);
     			} else {
@@ -181,50 +181,54 @@ public class ReturnSalesOrder {
 			}
 		});
 		return returnOrderReference.get();
-    }
-    
-    /**
-     * Process a RMA
-     * @param rmaId
-     * @param documentAction
-     * @return
-     */
-    public static MOrder processRMA(int rmaId, int posId, String documentAction, String description) {
-    	if(rmaId <= 0) {
+	}
+
+	/**
+	 * Process a RMA
+	 * @param rmaId
+	 * @param documentAction
+	 * @see {@link ReverseSalesTransaction#processReverseSalesOrder} method
+	 * @return
+	 */
+	public static MOrder processRMA(int rmaId, int posId, String documentAction, String description) {
+		if(rmaId <= 0) {
 			throw new AdempiereException("@M_RMA_ID@ @NotFound@");
 		}
-    	if(posId <= 0) {
+		if(posId <= 0) {
 			throw new AdempiereException("@C_POS_ID@ @NotFound@");
 		}
 		if(Util.isEmpty(documentAction)) {
 			throw new AdempiereException("@DocAction@ @IsMandatory@");
 		}
 		if(!documentAction.equals(MInOut.ACTION_Complete)
-				&& !documentAction.equals(MInOut.ACTION_Reverse_Accrual)
-				&& !documentAction.equals(MInOut.ACTION_Reverse_Correct)) {
+			&& !documentAction.equals(MInOut.ACTION_Close)
+			&& !documentAction.equals(MInOut.ACTION_Reverse_Accrual)
+			&& !documentAction.equals(MInOut.ACTION_Reverse_Correct)
+		) {
 			throw new AdempiereException("@DocAction@ @Invalid@");
 		}
 		AtomicReference<MOrder> rmaReference = new AtomicReference<MOrder>();
 		Trx.run(transactionName -> {
 			MOrder rma = new MOrder(Env.getCtx(), rmaId, transactionName);
 			if(rma.isProcessed()) {
-				throw new AdempiereException("@M_InOut_ID@ @Processed@");
+				throw new AdempiereException("@M_RMA_ID@ @Processed@");
 			}
-			Optional.ofNullable(description).ifPresent(descriptionValue -> rma.addDescription(descriptionValue));
+			Optional.ofNullable(description).ifPresent(rma::addDescription);
 			if (!rma.processIt(documentAction)) {
 				throw new AdempiereException("@ProcessFailed@ :" + rma.getProcessMsg());
 			}
 			rma.saveEx(transactionName);
 			//	Generate Return
 			RMAUtil.generateReturnFromRMA(rma, transactionName);
-	        //	Generate Credit Memo
+			//	Generate Credit Memo
 			RMAUtil.generateCreditMemoFromRMA(rma, transactionName);
 			if(!rma.processIt(MOrder.DOCACTION_Close)) {
 				throw new AdempiereException("@ProcessFailed@ :" + rma.getProcessMsg());
-	        }
+			}
 			rma.saveEx(transactionName);
 			rmaReference.set(rma);
 		});
 		return rmaReference.get();
-    }
+	}
+
 }

@@ -27,22 +27,19 @@ jobs:
           java-version: 17
           architecture: x64
 
-      - name: Setup Gradle
+      - name: Setup Gradle 9
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: current # 8.0.2
+          gradle-version: 9.0.0 # current
 
-      - name: Set Main Version
-        run: echo "MAIN_VERSION=${{ github.event.release.name }}" >> src/main/java/org/spin/base/version.properties
-
-      - name: Set Release Date
-        run: echo "DATE_VERSION=$(date +'%Y-%m-%d')" >> src/main/java/org/spin/base/version.properties
-
-      - name: Set Implementation Version
-        run: echo "IMPLEMENTATION_VERSION=${{ github.event.release.tag_name }}" >> src/main/java/org/spin/base/version.properties
+      - name: Set Version Properties
+        run: |
+          echo "MAIN_VERSION=${{ github.event.release.name }}" >> src/main/java/org/spin/base/version.properties
+          echo "DATE_VERSION=$(date +'%Y-%m-%d')" >> src/main/java/org/spin/base/version.properties
+          echo "IMPLEMENTATION_VERSION=${{ github.event.release.tag_name }}" >> src/main/java/org/spin/base/version.properties
 
       - name: Run Create Release
-        run: gradle createRelease
+        run: gradle createRelease --warning-mode all --stacktrace
         env:
           ORG_GRADLE_PROJECT_deployUsername: ${{ secrets.DEPLOY_USER }}
           ORG_GRADLE_PROJECT_deployToken: ${{ secrets.DEPLOY_TOKEN }}
@@ -214,15 +211,27 @@ jobs:
         run: |
           echo "Pushing ALPINE image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine-${{ github.event.release.tag_name }}"
 
+      - name: Set Docker Alpine Tags
+        id: set_tags_alpine
+        run: |
+          # Get the release type
+          IS_PRE_RELEASE=${{ github.event.release.prerelease }}
+          # Set the base tags, always include the specific version tag
+          TAGS="${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}-alpine"
+          # If it's not a pre-release, add the "latest" tag
+          if [[ "$IS_PRE_RELEASE" == "false" ]]; then
+            TAGS+=",${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine"
+          fi
+          # Set the output variable for the next step to use
+          echo "tags_to_push=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Push alpine image in Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/alpine.Dockerfile
           push: true
-          tags: |
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:alpine-${{ github.event.release.tag_name }}
+          tags: ${{ steps.set_tags_alpine.outputs.tags_to_push }}
 
   # TODO: Download .tar and add docker image without uncompress
   # Publish docker image multiplatform in Docker Hub Registry to application
@@ -264,17 +273,29 @@ jobs:
         run: |
           echo "Pushing MULTI-ARCH image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}"
 
+      - name: Set Docker Tags
+        id: set_tags
+        run: |
+          # Get the release type
+          IS_PRE_RELEASE=${{ github.event.release.prerelease }}
+          # Set the base tags, always include the specific version tag
+          TAGS="${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}"
+          # If it's not a pre-release, add the "latest" tag
+          if [[ "$IS_PRE_RELEASE" == "false" ]]; then
+            TAGS+=",${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:latest"
+          fi
+          # Set the output variable for the next step to use
+          echo "tags_to_push=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Push image in Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/focal.Dockerfile
+          file: docker/ubuntu.Dockerfile
           platforms: linux/amd64,linux/amd64/v2
           # platforms: linux/amd64,linux/amd64/v2,linux/arm64/v8
           push: true
-          tags: |
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:${{ github.event.release.tag_name }}
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO }}:latest
+          tags: ${{ steps.set_tags.outputs.tags_to_push }}
 
 
   # Publish docker image multiplatform in Docker Hub Registry to application
@@ -313,6 +334,20 @@ jobs:
         run: |
           echo "Pushing PROXY image to: ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:${{ github.event.release.tag_name }}"
 
+      - name: Set Docker Tags
+        id: set_envoy_tags
+        run: |
+          # Get the release type
+          IS_PRE_RELEASE=${{ github.event.release.prerelease }}
+          # Set the base tags, always include the specific version tag
+          TAGS="${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:${{ github.event.release.tag_name }}"
+          # If it's not a pre-release, add the "latest" tag
+          if [[ "$IS_PRE_RELEASE" == "false" ]]; then
+            TAGS+=",${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:latest"
+          fi
+          # Set the output variable for the next step to use
+          echo "tags_to_push=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Push image in Docker Hub
         uses: docker/build-push-action@v6
         with:
@@ -320,6 +355,4 @@ jobs:
           file: docker/grpc_proxy.Dockerfile
           platforms: linux/amd64,linux/amd64/v2,linux/arm64/v8
           push: true
-          tags: |
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:${{ github.event.release.tag_name }}
-            ${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REPO_PROXY }}:latest
+          tags: ${{ steps.set_envoy_tags.outputs.tags_to_push }}

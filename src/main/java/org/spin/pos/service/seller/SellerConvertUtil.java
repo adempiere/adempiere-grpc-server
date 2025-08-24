@@ -13,49 +13,73 @@
  * Copyright (C) 2018-2023 E.R.P. Consultores y Asociados, S.A. All Rights Reserved. *
  * Contributor(s): Edwin Betancourt, EdwinBetanc0urt@outlook.com                     *
  *************************************************************************************/
-package org.spin.base.util;
 
-import org.compiere.model.MTable;
+package org.spin.pos.service.seller;
+
+import org.compiere.model.MClientInfo;
+import org.compiere.model.MUser;
 import org.compiere.util.Env;
-import org.spin.backend.grpc.general_ledger.AccountingDocument;
+import org.spin.backend.grpc.pos.AvailableSeller;
+import org.spin.model.MADAttachmentReference;
 import org.spin.service.grpc.util.value.StringManager;
+import org.spin.util.AttachmentUtil;
 
-/**
- * This class was created for add all convert methods for General Ledger service
- * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
- */
-public class GeneralLedgerConvertUtil {
+public class SellerConvertUtil {
 
-	public static AccountingDocument.Builder convertAccountingDocument(int tableId) {
-		AccountingDocument.Builder builder = AccountingDocument.newBuilder();
-		if (tableId <= 0) {
-			return builder;
+	/**
+	 * Convert User entity
+	 * @param user
+	 * @return
+	 */
+	public static AvailableSeller.Builder convertSeller(MUser user) {
+		AvailableSeller.Builder sellerInfo = AvailableSeller.newBuilder();
+		if (user == null) {
+			return sellerInfo;
 		}
-		MTable table = MTable.get(Env.getCtx(), tableId);
-		builder = convertAccountingDocument(table);
-		return builder;
-	}
-	public static AccountingDocument.Builder convertAccountingDocument(MTable table) {
-		AccountingDocument.Builder builder = AccountingDocument.newBuilder();
-		if (table == null || table.getAD_Table_ID() <= 0) {
-			return builder;
-		}
-
-		builder.setId(
-				table.getAD_Table_ID()
+		sellerInfo.setId(
+				user.getAD_User_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					user.getUUID()
+				)
 			)
 			.setName(
 				StringManager.getValidString(
-					table.getName()
+					user.getName()
 				)
 			)
-			.setTableName(
+			.setDescription(
 				StringManager.getValidString(
-					table.getTableName()
+					user.getDescription()
+				)
+			)
+			.setComments(
+				StringManager.getValidString(
+					user.getComments()
 				)
 			)
 		;
 
-		return builder;
+		int clientId = Env.getAD_Client_ID(Env.getCtx());
+		if(user.getLogo_ID() > 0 && AttachmentUtil.getInstance().isValidForClient(clientId)) {
+			MClientInfo clientInfo = MClientInfo.get(Env.getCtx(), clientId);
+			MADAttachmentReference attachmentReference = MADAttachmentReference.getByImageId(
+				Env.getCtx(),
+				clientInfo.getFileHandler_ID(),
+				user.getLogo_ID(),
+				null
+			);
+			if(attachmentReference != null
+					&& attachmentReference.getAD_AttachmentReference_ID() > 0) {
+				sellerInfo.setImage(
+					StringManager.getValidString(
+						attachmentReference.getValidFileName()
+					)
+				);
+			}
+		}
+		return sellerInfo;
 	}
+
 }

@@ -29,7 +29,6 @@ import org.spin.grpc.service.BusinessData;
 import org.spin.grpc.service.Dashboarding;
 import org.spin.grpc.service.Enrollment;
 import org.spin.grpc.service.FileManagement;
-import org.spin.grpc.service.GeneralLedger;
 import org.spin.grpc.service.LogsInfo;
 import org.spin.grpc.service.MaterialManagement;
 import org.spin.grpc.service.NoticeManagement;
@@ -47,6 +46,7 @@ import org.spin.grpc.service.UserCustomization;
 import org.spin.grpc.service.UserInterface;
 import org.spin.grpc.service.WebStore;
 import org.spin.grpc.service.Workflow;
+import org.spin.grpc.service.accounting.GeneralLedgerService;
 import org.spin.grpc.service.core_functionality.CoreFunctionality;
 import org.spin.grpc.service.dictionary.Dictionary;
 import org.spin.grpc.service.display_definition.DisplayDefinition;
@@ -61,12 +61,12 @@ import org.spin.grpc.service.field.product.ProductInfo;
 import org.spin.grpc.service.form.ExpressMovement;
 import org.spin.grpc.service.form.ExpressReceipt;
 import org.spin.grpc.service.form.ExpressShipment;
-import org.spin.grpc.service.form.PaymentAllocation;
 import org.spin.grpc.service.form.bank_statement_match.BankStatementMatch;
 import org.spin.grpc.service.form.import_file_loader.ImportFileLoader;
 import org.spin.grpc.service.form.issue_management.IssueManagement;
 import org.spin.grpc.service.form.match_po_receipt_invoice.MatchPOReceiptInvoice;
 import org.spin.grpc.service.form.out_bound_order.OutBoundOrderService;
+import org.spin.grpc.service.form.payment_allocation.PaymentAllocationService;
 import org.spin.grpc.service.form.payroll_action_notice.PayrollActionNotice;
 import org.spin.grpc.service.form.task_management.TaskManagement;
 import org.spin.grpc.service.form.trial_balance_drillable.TrialBalanceDrillable;
@@ -208,8 +208,8 @@ public class AllInOneServices {
 		serverBuilder.addService(new FileManagement());
 		logger.info("Service " + FileManagement.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	General Ledger
-		serverBuilder.addService(new GeneralLedger());
-		logger.info("Service " + GeneralLedger.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
+		serverBuilder.addService(new GeneralLedgerService());
+		logger.info("Service " + GeneralLedgerService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	Import File Loader
 		serverBuilder.addService(new ImportFileLoader());
 		logger.info("Service " + ImportFileLoader.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
@@ -247,8 +247,8 @@ public class AllInOneServices {
 		serverBuilder.addService(new PaymentInfoService());
 		logger.info("Service " + PaymentInfoService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	Payment Allocation
-		serverBuilder.addService(new PaymentAllocation());
-		logger.info("Service " + PaymentAllocation.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
+		serverBuilder.addService(new PaymentAllocationService());
+		logger.info("Service " + PaymentAllocationService.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());
 		//	Payment Print/Export
 		serverBuilder.addService(new PaymentPrintExport());
 		logger.info("Service " + PaymentPrintExport.class.getName() + " added on " + SetupLoader.getInstance().getServer().getPort());

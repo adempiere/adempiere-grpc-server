@@ -19,6 +19,7 @@ import java.util.Properties;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +37,8 @@ import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 import org.spin.backend.grpc.common.ListLookupItemsResponse;
 import org.spin.backend.grpc.form.trial_balance_drillable.FactAcctSummary;
-import org.spin.backend.grpc.form.trial_balance_drillable.ListAccoutingKeysRequest;
+import org.spin.backend.grpc.form.trial_balance_drillable.GetDefaultPeriodRequest;
+import org.spin.backend.grpc.form.trial_balance_drillable.ListAccountingKeysRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListBudgetsRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListFactAcctSummaryRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListFactAcctSummaryResponse;
@@ -44,11 +46,13 @@ import org.spin.backend.grpc.form.trial_balance_drillable.ListOrganizationsReque
 import org.spin.backend.grpc.form.trial_balance_drillable.ListPeriodsRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListReportCubesRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListUser1Request;
+import org.spin.backend.grpc.form.trial_balance_drillable.Period;
 import org.spin.base.util.ReferenceUtil;
 import org.spin.grpc.service.field.field_management.FieldManagementLogic;
 import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.value.NumberManager;
 import org.spin.service.grpc.util.value.StringManager;
+import org.spin.service.grpc.util.value.TimeManager;
 
 /**
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
@@ -78,7 +82,7 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
@@ -102,7 +106,7 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
@@ -113,15 +117,20 @@ public class TrialBalanceDrillableServiceLogic {
 		final int columnId = 69948; // GL_JournalLine.User1_ID
 		MColumn column = MColumn.get(Env.getCtx(), columnId);
 
+		// final int clientId = Env.getAD_Client_ID(Env.getCtx());
+		// final String customRestriction = "C_ElementValue.IsActive='Y' AND C_ElementValue.AD_Client_ID = " + clientId;
+		final String customRestriction = "C_ElementValue.IsActive='Y' AND C_ElementValue.AD_Client_ID = @#AD_Client_ID@";
+
 		final int tableReferenceId = 134; // where clause C_ElementValue.IsActive='Y'
 		// AND C_ElementValue.IsSummary='N' AND C_ElementValue.C_Element_ID IN 
 		// (SELECT C_Element_ID FROM C_AcctSchema_Element ase WHERE ase.ElementType='U1' 
 		// AND ase.AD_Client_ID=@AD_Client_ID@)
 		MLookupInfo reference = ReferenceUtil.getReferenceLookupInfo(
-			DisplayType.TableDir,
+			DisplayType.Table,
 			tableReferenceId,
 			column.getColumnName(),
-			0
+			0,
+			customRestriction
 		);
 
 		ListLookupItemsResponse.Builder builderList = FieldManagementLogic.listLookupItems(
@@ -130,12 +139,60 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
 	}
 
+
+
+	public static Period.Builder getDefaultPeriod(GetDefaultPeriodRequest request) {
+		Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+		int organizationId = request.getOrganizationId();
+		if (organizationId <= 0) {
+			organizationId = Env.getAD_Org_ID(Env.getCtx());
+		}
+
+		Period.Builder builder = Period.newBuilder();
+		MPeriod period = MPeriod.get(Env.getCtx(), currentTime, organizationId, null);
+		if (period == null || period.getC_Period_ID() <= 0) {
+			return builder;
+		}
+
+		builder.setId(
+				period.getC_Period_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					period.getUUID()
+				)
+			)
+			.setName(
+				StringManager.getValidString(
+					period.getName()
+				)
+			)
+			.setPeriodNo(
+				period.getPeriodNo()
+			)
+			.setStartDate(
+				TimeManager.convertDateToValue(
+					period.getStartDate()
+				)
+			)
+			.setEndDate(
+				TimeManager.convertDateToValue(
+					period.getEndDate()
+				)
+			)
+			.setIsActive(
+				period.isActive()
+			)
+		;
+
+		return builder;
+	}
 
 	public static ListLookupItemsResponse.Builder listPeriods(ListPeriodsRequest request) {
 		final int columnId = 2516; // Fact_Acct.C_Period_ID
@@ -155,14 +212,15 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
 	}
 
 
-	public static ListLookupItemsResponse.Builder listAccoutingKeys(ListAccoutingKeysRequest request) {
+
+	public static ListLookupItemsResponse.Builder listAccountingKeys(ListAccountingKeysRequest request) {
 		final int columnId = 69936; // GL_JournalLine.Account_ID
 		MColumn column = MColumn.get(Env.getCtx(), columnId);
 		final int clientId = Env.getAD_Client_ID(Env.getCtx());
@@ -173,7 +231,7 @@ public class TrialBalanceDrillableServiceLogic {
 			tableReferenceId,
 			column.getColumnName(),
 			0,
-			"C_ElementValue.IsActive='Y' AND C_ElementValue.AD_Client_ID=" + clientId
+			"C_ElementValue.IsActive = 'Y' AND C_ElementValue.AD_Client_ID = " + clientId
 		);
 
 		ListLookupItemsResponse.Builder builderList = FieldManagementLogic.listLookupItems(
@@ -182,7 +240,7 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
@@ -206,7 +264,7 @@ public class TrialBalanceDrillableServiceLogic {
 			request.getPageSize(),
 			request.getPageToken(),
 			request.getSearchValue(),
-			request.getIsOnlyActiveRecords()
+			true
 		);
 
 		return builderList;
@@ -298,15 +356,15 @@ public class TrialBalanceDrillableServiceLogic {
 			filterParametersList.add(user1_ID);
 		}
 
-		int accountingFromId = request.getAccoutingFromId();
-		int accountingToId = request.getAccoutingToId();
+		int accountingFromId = request.getAccountingFromId();
+		int accountingToId = request.getAccountingToId();
 		String accountingFromValue = null;
 		String accountingToValue = null;
 
 		if (accountingFromId > 0 || accountingToId > 0) {
-			final String sqlAccoutingValue = "SELECT Value from C_ElementValue WHERE C_ElementValue_ID = ?";
-			accountingFromValue = DB.getSQLValueString(null, sqlAccoutingValue, accountingFromId);
-			accountingToValue = DB.getSQLValueString(null, sqlAccoutingValue, accountingToId);
+			final String sqlAccountingValue = "SELECT Value from C_ElementValue WHERE C_ElementValue_ID = ?";
+			accountingFromValue = DB.getSQLValueString(null, sqlAccountingValue, accountingFromId);
+			accountingToValue = DB.getSQLValueString(null, sqlAccountingValue, accountingToId);
 
 			if (accountingFromValue != null && accountingToValue != null) {
 				sql.append(" AND (fs.Account_ID IS NULL OR EXISTS (SELECT * FROM C_ElementValue ev ")

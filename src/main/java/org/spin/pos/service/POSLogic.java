@@ -25,11 +25,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.protobuf.Empty;
 import org.adempiere.core.domains.models.I_AD_PrintFormatItem;
+import org.adempiere.core.domains.models.I_AD_Ref_List;
+import org.adempiere.core.domains.models.I_AD_Reference;
 import org.adempiere.core.domains.models.I_C_BPartner;
 import org.adempiere.core.domains.models.I_C_OrderLine;
 import org.adempiere.core.domains.models.I_C_POS;
 import org.adempiere.core.domains.models.I_M_DiscountSchema;
 import org.adempiere.core.domains.models.I_M_InOutLine;
+import org.adempiere.core.domains.models.X_C_Payment;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.model.MBPartner;
 import org.compiere.model.MDiscountSchema;
@@ -39,6 +42,7 @@ import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MPOS;
 import org.compiere.model.MPayment;
+import org.compiere.model.MRefList;
 import org.compiere.model.MRole;
 import org.compiere.model.MTable;
 import org.compiere.model.MUOMConversion;
@@ -53,11 +57,14 @@ import org.spin.backend.grpc.pos.CancelOnlinePaymentRequest;
 import org.spin.backend.grpc.pos.CancelOnlinePaymentResponse;
 import org.spin.backend.grpc.pos.CreateGiftCardLineRequest;
 import org.spin.backend.grpc.pos.CreateGiftCardRequest;
+import org.spin.backend.grpc.pos.CreditCardType;
 import org.spin.backend.grpc.pos.Customer;
 import org.spin.backend.grpc.pos.CustomerTemplate;
 import org.spin.backend.grpc.pos.DeleteGiftCardLineRequest;
 import org.spin.backend.grpc.pos.DeleteGiftCardRequest;
+import org.spin.backend.grpc.pos.DeletePaymentReferenceRequest;
 import org.spin.backend.grpc.pos.GetCustomerRequest;
+import org.spin.backend.grpc.pos.GetValidGiftCardRequest;
 import org.spin.backend.grpc.pos.GiftCard;
 import org.spin.backend.grpc.pos.GiftCardLine;
 import org.spin.backend.grpc.pos.InfoOnlinePaymentRequest;
@@ -68,6 +75,8 @@ import org.spin.backend.grpc.pos.ListAvailableOrderLinesForGiftCardRequest;
 import org.spin.backend.grpc.pos.ListAvailableOrderLinesForGiftCardResponse;
 import org.spin.backend.grpc.pos.ListAvailableOrderLinesForRMARequest;
 import org.spin.backend.grpc.pos.ListAvailableOrderLinesForRMAResponse;
+import org.spin.backend.grpc.pos.ListCreditCardTypesRequest;
+import org.spin.backend.grpc.pos.ListCreditCardTypesResponse;
 import org.spin.backend.grpc.pos.ListCustomerTemplatesRequest;
 import org.spin.backend.grpc.pos.ListCustomerTemplatesResponse;
 import org.spin.backend.grpc.pos.ListCustomersRequest;
@@ -87,8 +96,10 @@ import org.spin.base.util.DocumentUtil;
 import org.spin.base.util.RecordUtil;
 import org.spin.pos.service.order.RMAUtil;
 import org.spin.pos.service.order.ShipmentUtil;
+import org.spin.pos.service.payment.GiftCardManagement;
 import org.spin.pos.service.pos.POS;
 import org.spin.pos.util.POSConvertUtil;
+import org.spin.pos.util.PaymentConvertUtil;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.value.NumberManager;
@@ -96,6 +107,88 @@ import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 public class POSLogic {
+
+	public static ListCreditCardTypesResponse.Builder listCreditCardTypes(ListCreditCardTypesRequest request) {
+		// Credit Card Type = 125
+		final int referenceId = X_C_Payment.CREDITCARDTYPE_AD_Reference_ID;
+		final String whereClause = I_AD_Reference.COLUMNNAME_AD_Reference_ID + " = ? ";
+
+		Query query = new Query(
+			Env.getCtx(),
+			I_AD_Ref_List.Table_Name,
+			whereClause,
+			null
+		)
+			.setParameters(referenceId)
+			.setOnlyActiveRecords(true)
+			.setApplyAccessFilter(MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO)
+		;
+
+		//	Get page and count
+		String nexPageToken = null;
+		int pageNumber = LimitUtil.getPageNumber(SessionManager.getSessionUuid(), request.getPageToken());
+		int limit = LimitUtil.getPageSize(request.getPageSize());
+		int offset = (pageNumber - 1) * limit;
+		int recordCount = query.count();
+
+		ListCreditCardTypesResponse.Builder builderList = ListCreditCardTypesResponse.newBuilder()
+			.setRecordCount(recordCount)
+			.setNextPageToken(
+				StringManager.getValidString(nexPageToken)
+			)
+		;
+
+		//	Get List
+		query.setLimit(limit, offset)
+			.<MRefList>list()
+			.forEach(refList -> {
+				CreditCardType.Builder builder = PaymentConvertUtil.convertCreditCardType(nexPageToken);
+				builderList.addRecords(builder);
+			})
+		;
+
+		return builderList;
+	}
+
+
+	/**
+	 * Delete order line from uuid
+	 * @param request
+	 * @return
+	 */
+	public static Empty.Builder deletePaymentReference(DeletePaymentReferenceRequest request) {
+		// MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
+		if(request.getId() <= 0) {
+			throw new AdempiereException("@C_POSPaymentReference_ID@ @IsMandatory@");
+		}
+		if(MTable.get(Env.getCtx(), "C_POSPaymentReference") == null) {
+			return Empty.newBuilder();
+		}
+		Trx.run(transactionName -> {
+			PO refundReference = RecordUtil.getEntity(
+				Env.getCtx(),
+				"C_POSPaymentReference",
+				request.getId(),
+				transactionName
+			);
+			if(refundReference == null || refundReference.get_ID() <= 0) {
+				throw new AdempiereException("@C_POSPaymentReference_ID@ @NotFound@");
+			}
+			if ("G".equals(refundReference.get_ValueAsString("TenderType"))) {
+				if (refundReference.get_ValueAsInt("ECA14_GiftCard_ID") > 0) {
+					GiftCardManagement.unProcessingGiftCard(
+							refundReference.get_ValueAsInt("ECA14_GiftCard_ID"), true
+					);
+				}
+			}
+			//	Validate processed Order
+			refundReference.deleteEx(true);
+		});
+		//	Return
+		return Empty.newBuilder();
+	}
+
+
 
 	public static ListAvailableDiscountsResponse.Builder listAvailableDiscounts(ListAvailableDiscountsRequest request) {
 		if(request.getPosId() <= 0) {
@@ -230,7 +323,7 @@ public class POSLogic {
 				whereClause.append(" AND ");
 			}
 			whereClause.append(
-				"(UPPER(Name) LIKE UPPER(?))"
+				"(UPPER(Name) LIKE '%' || UPPER(?) || '%')"
 			);
 			//	Add parameters
 			parameters.add(request.getName());
@@ -638,6 +731,32 @@ public class POSLogic {
 	}
 
 
+	public static GiftCard.Builder getValidGiftCard(GetValidGiftCardRequest request) {
+		if (Util.isEmpty(request.getSearchValue(), true)) {
+			throw new AdempiereException("@FillMandatory@ @SearchValue@");
+		}
+		PO giftCard = new Query(
+			Env.getCtx(),
+			"ECA14_GiftCard",
+			"UPPER(UUID) = UPPER(?)",
+			null
+		)
+			.setParameters(request.getSearchValue())
+			.first()
+		;
+		if (giftCard == null || giftCard.get_ID() <= 0) {
+			throw new AdempiereException("@ECA14_GiftCard_ID@ @NotFound@");
+		}
+		if (giftCard.get_ValueAsBoolean("Processing")) {
+			throw new AdempiereException("@ECA14_GiftCard_ID@ @Processing@");
+		}
+		if (giftCard.get_ValueAsBoolean("Processed")) {
+			throw new AdempiereException("@ECA14_GiftCard_ID@ @Processed@");
+		}
+
+		return POSConvertUtil.convertGiftCard(giftCard);
+	}
+
 
 	public static GiftCard.Builder getGiftCard(int id, String transactionName) {
 		PO giftCard = RecordUtil.getEntity(
@@ -652,7 +771,7 @@ public class POSLogic {
 		Properties context = Env.getCtx();
 		MTable table = MTable.get(context, "ECA14_GiftCard");
 		if (table == null) {
-			throw new AdempiereException("@TableName@ @NotFound@");
+			throw new AdempiereException("@TableName@: ECA14_GiftCard @NotFound@");
 		}
 		if (request.getPosId() <= 0) {
 			throw new AdempiereException("@C_POS_ID@ @NotFound@");
@@ -707,7 +826,7 @@ public class POSLogic {
 		if (isPrepayment) {
 			//TODO: Prepayment Validations
 			;
-		}else {
+		} else {
 			if (orderId <= 0) {
 				throw new AdempiereException("@C_Order_ID@ @NotFound@");
 			}
@@ -1029,7 +1148,7 @@ public class POSLogic {
 				throw new AdempiereException("@ECA14_GiftCardLine_ID@ @NotFound@");
 			}
 			//	Validate processed Order
-			if (giftCardLine.get_ValueAsBoolean("IsProcessed")) {
+			if (giftCardLine.get_ValueAsBoolean("Processed")) {
 				throw new AdempiereException("@ECA14_GiftCardLine_ID@ @Processed@");
 			}
 
@@ -1098,7 +1217,7 @@ public class POSLogic {
 			return Empty.newBuilder();
 		}
 		//	Validate processed Order
-		if (giftCardLine.get_ValueAsBoolean("IsProcessed") || giftCardLine.get_ValueAsBoolean("IsProcessing")) {
+		if (giftCardLine.get_ValueAsBoolean("Processed") || giftCardLine.get_ValueAsBoolean("Processing")) {
 			throw new AdempiereException("@ECA14_GiftCardLine_ID@ @Processed@");
 		}
 
@@ -1248,12 +1367,15 @@ public class POSLogic {
 		/*
 		Trx.run(transactionName -> {
 			InfoOnlinePaymentResponse.Builder builder = InfoOnlinePaymentResponse.newBuilder();
-
 			MPayment payment = new MPayment(Env.getCtx(), request.getId(), transactionName);
-			payment.getOnlineStatus();
+			boolean isForcedStatus = payment.getOnlineStatus();
 			String message = payment.get_ValueAsString("ResponseMessage");
 			String status = payment.get_ValueAsString("ResponseStatus");
 			boolean isError = "E".equals(status) || "R".equals(status);
+			if(isForcedStatus) {
+				isError = false;
+				status = "R";
+			}
 			builder
 				.setIsError(isError)
 				.setMessage(
@@ -1287,11 +1409,13 @@ public class POSLogic {
 		Trx.run(transactionName -> {
 			MPayment payment = new MPayment(Env.getCtx(), request.getId(), null);
 			CancelOnlinePaymentResponse.Builder builder = CancelOnlinePaymentResponse.newBuilder();
-			payment.reverseOnlineTransaction();
+			boolean wasReversed = payment.reverseOnlineTransaction();
 			String message = payment.get_ValueAsString("ResponseMessage");
 			String status = payment.get_ValueAsString("ResponseStatus");
 			boolean isError = "E".equals(status) || "R".equals(status);
-
+			if(wasReversed) {
+				isError = false;
+			}
 			builder
 				.setIsError(isError)
 				.setMessage(
@@ -1310,5 +1434,7 @@ public class POSLogic {
 		*/
 		return builderReference.get();
 	}
+
+
 
 }

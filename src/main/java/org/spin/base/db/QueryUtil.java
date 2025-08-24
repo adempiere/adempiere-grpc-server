@@ -16,7 +16,6 @@ package org.spin.base.db;
 
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.adempiere.model.MBrowse;
 import org.adempiere.model.MBrowseField;
@@ -35,7 +34,12 @@ import org.spin.base.util.LookupUtil;
 import org.spin.base.util.ReferenceInfo;
 import org.spin.base.util.ReferenceUtil;
 import org.spin.service.grpc.util.db.FromUtil;
+import org.spin.service.grpc.util.db.JoinUtil;
 
+/**
+ * Class for handle SQL Query columns
+ * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
+ */
 public class QueryUtil {
 
 	/**
@@ -260,25 +264,47 @@ public class QueryUtil {
 	public static String getBrowserQuery(MBrowse browser) {
 		StringBuffer sql = new StringBuffer();
 		sql.append("SELECT DISTINCT ");
-		AtomicBoolean isAddFirstColumn = new AtomicBoolean(false);
-		final List<MBrowseField> browseFieldsList = browser.getFields();
+
+		// field key first always
+		MBrowseField fieldKey = browser.getFieldKey();
+		if(fieldKey == null) {
+			MViewColumn column = new MViewColumn(browser.getCtx() , 0 , browser.get_TrxName());
+			column.setName("Row");
+			column.setColumnSQL("'Row' AS \"Row\"");
+
+			fieldKey = new MBrowseField(browser , column);
+			fieldKey.setAD_Reference_ID(DisplayType.ID);
+			fieldKey.setIsKey(true);
+			fieldKey.setIsReadOnly(false);
+		}
+
+		if (!Util.isEmpty(fieldKey.getAD_View_Column().getColumnSQL(), true)) {
+			sql.append(
+					fieldKey.getAD_View_Column().getColumnSQL()
+				)
+				.append(" AS")
+			;
+		}
+		sql.append(" \"" + fieldKey.getAD_View_Column().getColumnName() + "\"");
+
+		final List<MBrowseField> browseFieldsList = browser.getDisplayFields();
 		for (MBrowseField browseField : browseFieldsList) {
 			if (browseField == null) {
 				continue;
 			}
-			if (!browseField.isActive()) {
-				// key column on table
-				if (!browseField.isKey()) {
-					continue;
-				}
-			}
-			// TODO: Add sort column
-			if (!(browseField.isKey() || browseField.isDisplayed() || browseField.isIdentifier())) {
+			// key column on table
+			if (browseField.isKey()) {
 				continue;
 			}
-			if (isAddFirstColumn.get()) {
-				sql.append(", ");
+			if (!browseField.isActive()) {
+				continue;
 			}
+			// Sort column to get `DisplayColumn_`
+			// if (!(browseField.isDisplayed() || browseField.isIdentifier() || browseField.isOrderBy())) {
+			// 	continue;
+			// }
+
+			sql.append(", ");
 
 			MViewColumn viewColumn = MViewColumn.getById(
 				browseField.getCtx(),
@@ -286,13 +312,14 @@ public class QueryUtil {
 				null
 			);
 			if (!Util.isEmpty(viewColumn.getColumnSQL(), true)) {
-				sql.append(viewColumn.getColumnSQL());
-				isAddFirstColumn.set(true);
+				sql.append(
+						viewColumn.getColumnSQL()
+					)
+					.append(" AS ")
+				;
 			}
 
-			sql.append(" AS ")
-				.append("\"" + viewColumn.getColumnName() + "\"")
-			;
+			sql.append("\"" + viewColumn.getColumnName() + "\"");
 		}
 
 		MView view = new MView(browser.getCtx(), browser.getAD_View_ID());
@@ -313,9 +340,13 @@ public class QueryUtil {
 
 		StringBuffer queryToAdd = new StringBuffer(originalQuery.substring(0, fromIndex));
 		StringBuffer joinsToAdd = new StringBuffer(originalQuery.substring(fromIndex, originalQuery.length() - 1));
+		String secondJoin = JoinUtil.fixSqlFromClause(joinsToAdd.toString());
+		if (!Util.isEmpty(secondJoin, true)) {
+			joinsToAdd = new StringBuffer(secondJoin);
+		}
 
 		final Language language = Language.getLanguage(Env.getAD_Language(browser.getCtx()));
-		final List<MBrowseField> browseFieldsList = browser.getFields();
+		final List<MBrowseField> browseFieldsList = browser.getDisplayFields();
 		for (MBrowseField browseField : browseFieldsList) {
 			if (browseField == null) {
 				continue;
@@ -343,6 +374,8 @@ public class QueryUtil {
 
 			if (ReferenceUtil.validateReference(displayTypeId)) {
 				MViewColumn viewColumn = MViewColumn.getById(browseField.getCtx(), browseField.getAD_View_Column_ID(), null);
+				final String dbColumnName = viewColumn.getColumnName();
+
 				MViewDefinition viewDefinition = MViewDefinition.get(browseField.getCtx(), viewColumn.getAD_View_Definition_ID());
 				final String tableName = viewDefinition.getTableAlias();
 
@@ -361,12 +394,12 @@ public class QueryUtil {
 						displayTypeId,
 						referenceValueId,
 						columnName,
+						dbColumnName,  // as column alias
 						language.getAD_Language(),
 						tableName
 					);
 				if(referenceInfo != null) {
 					queryToAdd.append(", ");
-					final String dbColumnName = viewColumn.getColumnName();
 					referenceInfo.setDisplayColumnAlias(
 						LookupUtil.getDisplayColumnName(
 							dbColumnName
@@ -375,19 +408,25 @@ public class QueryUtil {
 					final String displayColumn = referenceInfo.getDisplayValue(columnName);
 					queryToAdd.append(displayColumn);
 
-					String joinClause = referenceInfo.getJoinValue(columnName, tableName);
-					if (viewColumn.getAD_Column_ID() <= 0) {
+					String joinClause = "";
+					if (viewColumn.getAD_Column_ID() > 0) {
+						joinClause = referenceInfo.getJoinValue(columnName, tableName);
+					} else {
 						// sub query
-						joinClause = referenceInfo.getJoinValue(columnName);
-						if (!Util.isEmpty(viewColumn.getColumnSQL(), true) && viewColumn.getColumnSQL().contains("(")) {
+						if (!Util.isEmpty(viewColumn.getColumnSQL(), true)) {
 							joinClause = referenceInfo.getJoinValue(viewColumn.getColumnSQL());
+						} else {
+							joinClause = referenceInfo.getJoinValue(columnName);
 						}
 					}
 					joinsToAdd.append(joinClause);
 				}
 			}
 		}
-		queryToAdd.append(joinsToAdd);
+		queryToAdd
+			.append(" ")
+			.append(joinsToAdd)
+		;
 		return queryToAdd.toString();
 	}
 

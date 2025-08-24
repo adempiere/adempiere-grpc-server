@@ -173,6 +173,9 @@ allprojects {
 		into "${projectDir}/resources/"
 		// into "${projectDir}/docker-compose/envoy/definitions/"
 		// rename { "${descriptorFile}" }
+
+		// task dependency
+		dependsOn "generateTestProto"
 	}
 
 	tasks.matching {
@@ -189,6 +192,7 @@ sourceSets {
             srcDirs 'build/generated/source/proto/main/grpc'
             srcDirs 'build/generated/source/proto/main/java'
             srcDirs 'src/main/proto'
+			srcDirs 'src/patches'
         }
         resources {
     		srcDirs 'src/main/java'
@@ -198,7 +202,6 @@ sourceSets {
     }
 }
 
-startScripts.enabled = false
 
 run {
 	doFirst {
@@ -212,9 +215,51 @@ run {
 	]
 }
 
+// compressed files task
+distTar {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+distZip {
+	dependsOn compileTestJava, copyDescriptor, startScripts
+}
+
+startScripts {
+	applicationName = 'start-backend'
+
+	// default JVM setting
+	defaultJvmOpts = [
+		"-DPropertyFile=Adempiere.properties", 
+		"-Dorg.adempiere.server.embedded=true"
+	]
+	outputDir = new File(project.buildDir, 'tmp')
+	classpath = jar.outputs.files + project.configurations.runtimeClasspath
+
+	// Configure script names with extensions
+	doLast {
+		def unixScript = file(getUnixScript())
+		def windowsScript = file(getWindowsScript())
+
+		// Rename files after generating them
+		unixScript.renameTo("${unixScript.parent}/${applicationName}.sh")
+		windowsScript.renameTo("${windowsScript.parent}/${applicationName}.bat")
+
+		// Configure permissions for generated scripts
+		unixScript.setExecutable(true, false)
+		// windowsScript.setExecutable(true, false)
+	}
+}
+
 application {
 	// mainClass = javaMainClass
 	mainClass.set(javaMainClass)
+
+	// distribution output
+	distributions {
+		main {
+			contents {
+			}
+		}
+	}
 }
 jar {
 	manifest {
@@ -222,19 +267,6 @@ jar {
 			'Main-Class': javaMainClass
 		)
 	}
-}
-
-task ADempiereAllInOne(type: CreateStartScripts) {
-	mainClass = javaMainClass
-    applicationName = 'adempiere-all-in-one-server'
-    defaultJvmOpts = Arrays.asList("-DPropertyFile=Adempiere.properties", "-Dorg.adempiere.server.embedded=true")
-    outputDir = new File(project.buildDir, 'tmp')
-    classpath = jar.outputs.files + project.configurations.runtimeClasspath
-}
-
-applicationDistribution.into('bin') {
-	from(ADempiereAllInOne)
-    fileMode = 0755
 }
 
 //	Create release for project

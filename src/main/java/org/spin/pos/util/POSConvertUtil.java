@@ -24,7 +24,10 @@ import java.util.Optional;
 import org.adempiere.core.domains.models.I_AD_Ref_List;
 import org.adempiere.core.domains.models.I_AD_User;
 import org.adempiere.core.domains.models.I_C_BPartner;
+import org.adempiere.core.domains.models.I_C_Order;
+import org.adempiere.core.domains.models.I_C_OrderLine;
 import org.adempiere.core.domains.models.I_C_POS;
+import org.adempiere.core.domains.models.I_C_PaymentMethod;
 import org.compiere.model.MBPartner;
 import org.compiere.model.MBPartnerLocation;
 import org.compiere.model.MBank;
@@ -164,10 +167,10 @@ public class POSConvertUtil {
 			return tenderTypeValue;
 		}
 
-		MTable paymentTypeTable = MTable.get(Env.getCtx(), "C_PaymentMethod");
+		MTable paymentTypeTable = MTable.get(Env.getCtx(), I_C_PaymentMethod.Table_Name);
 
 		MCPaymentMethod paymentMethod = (MCPaymentMethod) paymentTypeTable.getPO(
-			availablePaymentMethod.get_ValueAsInt("C_PaymentMethod_ID"), null
+			availablePaymentMethod.get_ValueAsInt(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID), null
 		);
 		PaymentMethod.Builder paymentMethodBuilder = PaymentConvertUtil.convertPaymentMethod(
 			paymentMethod
@@ -276,17 +279,23 @@ public class POSConvertUtil {
 			)
 			.setUuid(
 				StringManager.getValidString(
-					giftCard.get_ValueAsString("UUID")
+					giftCard.get_ValueAsString(
+						I_C_Order.COLUMNNAME_UUID
+					)
 				)
 			)
 			.setDocumentNo(
 				StringManager.getValidString(
-					giftCard.get_ValueAsString("DocumentNo")
+					giftCard.get_ValueAsString(
+						I_C_Order.COLUMNNAME_DocumentNo
+					)
 				)
 			)
 			.setDescription(
 				StringManager.getValidString(
-					giftCard.get_ValueAsString("Description")
+					giftCard.get_ValueAsString(
+						I_C_Order.COLUMNNAME_Description
+					)
 				)
 			)
 			.setDateDoc(
@@ -304,13 +313,19 @@ public class POSConvertUtil {
 				)
 			)
 			.setOrderId(
-				giftCard.get_ValueAsInt("C_Order_ID")
+				giftCard.get_ValueAsInt(
+					I_C_Order.COLUMNNAME_C_Order_ID
+				)
 			)
 			.setIsProcessed(
-				giftCard.get_ValueAsBoolean("Processed")
+				giftCard.get_ValueAsBoolean(
+					I_C_Order.COLUMNNAME_Processed
+				)
 			)
 			.setIsProcessing(
-				giftCard.get_ValueAsBoolean("Processing")
+				giftCard.get_ValueAsBoolean(
+					I_C_Order.COLUMNNAME_Processing
+				)
 			)
 			.setAmount(
 				NumberManager.getBigDecimalToString(
@@ -321,18 +336,24 @@ public class POSConvertUtil {
 			)
 			.setCurrency(
 				CoreFunctionalityConvert.convertCurrency(
-					giftCard.get_ValueAsInt("C_Currency_ID")
+					giftCard.get_ValueAsInt(
+						I_C_Order.COLUMNNAME_C_Currency_ID
+					)
 				)
 			)
 			.setConversionTypeId(
-				giftCard.get_ValueAsInt("C_ConversionType_ID")
+				giftCard.get_ValueAsInt(
+					I_C_Order.COLUMNNAME_C_ConversionType_ID
+				)
 			)
 			.setIsPrepayment(
 				giftCard.get_ValueAsBoolean("IsPrepayment")
 			)
 			.setBusinessPartner(
 				CoreFunctionalityConvert.convertBusinessPartner(
-					giftCard.get_ValueAsInt("C_BPartner_ID")
+					giftCard.get_ValueAsInt(
+						I_C_Order.COLUMNNAME_C_BPartner_ID
+					)
 				)
 			)
 		;
@@ -423,22 +444,30 @@ public class POSConvertUtil {
 				)
 			)
 			.setOrderLineId(
-				giftCardLine.get_ValueAsInt("C_OrderLine_ID")
+				giftCardLine.get_ValueAsInt(
+					I_C_OrderLine.COLUMNNAME_C_OrderLine_ID
+				)
 			)
 			.setIsProcessed(
-				giftCardLine.get_ValueAsBoolean("Processed")
+				giftCardLine.get_ValueAsBoolean(
+					I_C_OrderLine.COLUMNNAME_Processed
+				)
 			)
 			.setQuantityEntered(
 				NumberManager.getBigDecimalToString(
 					NumberManager.getBigDecimalFromString(
-						giftCardLine.get_ValueAsString("QtyEntered")
+						giftCardLine.get_ValueAsString(
+							I_C_OrderLine.COLUMNNAME_QtyEntered
+						)
 					)
 				)
 			)
 			.setQuantityOrdered(
 				NumberManager.getBigDecimalToString(
 					NumberManager.getBigDecimalFromString(
-						giftCardLine.get_ValueAsString("QtyOrdered")
+						giftCardLine.get_ValueAsString(
+							I_C_OrderLine.COLUMNNAME_QtyOrdered
+						)
 					)
 				)
 			).setUom(
@@ -475,24 +504,24 @@ public class POSConvertUtil {
 		MUOMConversion productUom = null;
 		if (orderLine.getM_Product_ID() > 0) {
 			List<MUOMConversion> productsConversion = Arrays.asList(
-					MUOMConversion.getProductConversions(Env.getCtx(), product.getM_Product_ID())
+				MUOMConversion.getProductConversions(Env.getCtx(), product.getM_Product_ID())
 			);
 			Optional<MUOMConversion> maybeUom = productsConversion.parallelStream()
-					.filter(productConversion -> {
-						return productConversion.getC_UOM_To_ID() == orderLine.getC_UOM_ID();
-					})
-					.findFirst()
-					;
+				.filter(productConversion -> {
+					return productConversion.getC_UOM_To_ID() == orderLine.getC_UOM_ID();
+				})
+				.findFirst()
+			;
 			if (maybeUom.isPresent()) {
 				uom = maybeUom.get();
 			}
 
 			Optional<MUOMConversion> maybeProductUom = productsConversion.parallelStream()
-					.filter(productConversion -> {
-						return productConversion.getC_UOM_To_ID() == product.getC_UOM_ID();
-					})
-					.findFirst()
-					;
+				.filter(productConversion -> {
+					return productConversion.getC_UOM_To_ID() == product.getC_UOM_ID();
+				})
+				.findFirst()
+			;
 			if (maybeProductUom.isPresent()) {
 				productUom = maybeProductUom.get();
 			}
@@ -540,7 +569,7 @@ public class POSConvertUtil {
 			.setProductUom(
 				CoreFunctionalityConvert.convertProductConversion(productUom)
 			)
-			;
+		;
 	}
 
 

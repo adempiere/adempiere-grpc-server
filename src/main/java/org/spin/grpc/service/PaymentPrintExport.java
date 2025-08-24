@@ -16,6 +16,7 @@ package org.spin.grpc.service;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -802,11 +803,21 @@ public class PaymentPrintExport extends PaymentPrintExportImplBase {
 				throw new Exception(error.toString());
 			}
 
-			ByteString resultFile = ByteString.readFrom(new FileInputStream(tempFile));
-			ReportOutput.Builder output = ReportOutput.newBuilder()
-				.setOutputStream(resultFile)
-				.setOutputBytes(resultFile)
-			;
+			ByteString resultFile = ByteString.empty();
+			try {
+				FileInputStream inputStream = new FileInputStream(tempFile);
+				resultFile = ByteString.readFrom(inputStream);
+			} catch (IOException e) {
+				e.printStackTrace();
+				log.warning(e.getLocalizedMessage());
+			}
+
+			ReportOutput.Builder output = ReportOutput.newBuilder();
+			if (resultFile != null) {
+				output.setOutputStream(resultFile)
+					.setOutputBytes(resultFile)
+				;
+			}
 
 			builder.setReportOutput(output);
 		}
@@ -911,7 +922,8 @@ public class PaymentPrintExport extends PaymentPrintExportImplBase {
 			reportOutputBuilder.setMimeType("application/pdf");
 
 			IText7Document.mergePdf(pdfList, outFile);
-			ByteString resultFile = ByteString.readFrom(new FileInputStream(outFile));
+			FileInputStream inputStream = new FileInputStream(outFile);
+			ByteString resultFile = ByteString.readFrom(inputStream);
 			reportOutputBuilder.setOutputStream(resultFile);
 
 			builder.setReportOutput(reportOutputBuilder);
@@ -1073,21 +1085,22 @@ public class PaymentPrintExport extends PaymentPrintExportImplBase {
 
 		try {
 			File outFile = File.createTempFile("WPayPrint", null);
-			String validFileName = StringManager.getValidString(
-				outFile.getName()
-			);
-			reportOutputBuilder.setName(
-				validFileName
-			);
-			reportOutputBuilder.setMimeType(
-				StringManager.getValidString(
-					MimeType.getMimeType(validFileName)
-				)
-			);
-
 			IText7Document.mergePdf(pdfList, outFile);
-			ByteString resultFile = ByteString.readFrom(new FileInputStream(outFile));
-			reportOutputBuilder.setOutputStream(resultFile);
+			FileInputStream inputStream = new FileInputStream(outFile);
+			ByteString resultFile = ByteString.readFrom(inputStream);
+
+			reportOutputBuilder.setName(
+					StringManager.getValidString(
+						outFile.getName()
+					)
+				)
+				.setMimeType(
+					StringManager.getValidString(
+						MimeType.getMimeType(outFile.getName())
+					)
+				)
+				.setOutputStream(resultFile)
+			;
 
 			builder.setReportOutput(reportOutputBuilder);
 		}

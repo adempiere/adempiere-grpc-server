@@ -20,6 +20,7 @@ import java.sql.Timestamp;
 import java.util.Optional;
 
 import org.adempiere.core.domains.models.I_C_ConversionType;
+import org.adempiere.core.domains.models.I_C_Payment;
 import org.adempiere.core.domains.models.I_C_PaymentMethod;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.model.*;
@@ -32,6 +33,8 @@ import org.spin.base.util.ConvertUtil;
 import org.spin.base.util.RecordUtil;
 import org.spin.pos.service.order.OrderManagement;
 import org.spin.pos.service.order.OrderUtil;
+import org.spin.pos.service.payment.GiftCardManagement;
+import org.spin.pos.service.payment.PaymentManagement;
 import org.spin.pos.service.pos.POS;
 import org.spin.pos.util.ColumnsAdded;
 import org.spin.service.grpc.util.value.NumberManager;
@@ -54,8 +57,18 @@ public class CollectingManagement {
 		OrderManagement.validateOrderReleased(salesOrder);
 		OrderUtil.setCurrentDate(salesOrder);
 		String tenderType = request.getTenderTypeCode();
+		if (request.getAllocatePaymentId() <= 0) {
+			throw new AdempiereException("@C_POSPaymentTypeAllocation_ID@ @IsMandatory@");
+		}
+		PO paymentTypeAllocation = POS.getPaymentTypeAllocationId(request.getAllocatePaymentId(), null);
+		if (paymentTypeAllocation == null) {
+			throw new AdempiereException("@C_POSPaymentTypeAllocation_ID@ @NotFound@");
+		}
 		if(Util.isEmpty(tenderType)) {
 			tenderType = MPayment.TENDERTYPE_Cash;
+		}
+		if(tenderType.equals(MPayment.TENDERTYPE_CreditMemo) && request.getInvoiceId() <= 0 && paymentTypeAllocation.get_ValueAsBoolean(ColumnsAdded.IsMandatoryCreditMemoRef)) {
+			throw new AdempiereException("@" + ColumnsAdded.COLUMNNAME_ECA14_Invoice_Reference_ID + "@ @IsMandatory@");
 		}
 		if(!OrderUtil.isValidOrder(salesOrder)) {
 			throw new AdempiereException("@ActionNotAllowedHere@");
@@ -73,59 +86,35 @@ public class CollectingManagement {
 		//	Order
 		int currencyId = request.getCurrencyId();
 		if(currencyId <= 0) {
+			// TODO: Validate if currency with `paymentTypeAllocation`
 			currencyId = salesOrder.getC_Currency_ID();
 		}
 		//	Throw if not exist conversion
 		ConvertUtil.validateConversion(salesOrder, currencyId, pointOfSalesDefinition.get_ValueAsInt(I_C_ConversionType.COLUMNNAME_C_ConversionType_ID), RecordUtil.getDate());
 		//	
 		MPayment payment = new MPayment(Env.getCtx(), 0, transactionName);
+		payment.setIsReceipt(!request.getIsRefund());
 		payment.setC_BankAccount_ID(pointOfSalesDefinition.getC_BankAccount_ID());
-		//	Get from POS
-		int documentTypeId;
-		if(!request.getIsRefund()) {
-			documentTypeId = pointOfSalesDefinition.get_ValueAsInt("POSCollectingDocumentType_ID");
-		} else {
-			documentTypeId = pointOfSalesDefinition.get_ValueAsInt("POSRefundDocumentType_ID");
-		}
 
-		//	TODO: Validate with `allocatePaymenMethodtId` value
 		//	Payment Method
-		final int paymentMethodId = request.getPaymentMethodId();
-		if (paymentMethodId > 0) {
-			PO paymentTypeAllocation = POS.getPaymentMethodAllocation(paymentMethodId, pointOfSalesDefinition.getC_POS_ID(), null);
-			if(paymentTypeAllocation != null && paymentTypeAllocation.get_ID() > 0) {
-				if(paymentTypeAllocation.get_ValueAsInt("C_DocTypeTarget_ID") > 0 && !request.getIsRefund()) {
-					documentTypeId = pointOfSalesDefinition.get_ValueAsInt("C_DocTypeTarget_ID");
-				}
-			}
-			payment.set_ValueOfColumn(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID, paymentMethodId);
+		int paymentMethodId = request.getPaymentMethodId();
+		if (paymentMethodId <= 0) {
+			paymentMethodId = paymentTypeAllocation.get_ValueAsInt(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID);
 		}
+		// Set Online Payment
+		payment.setIsOnline(
+				paymentTypeAllocation.get_ValueAsBoolean("IsOnline")
+		);
+		payment.setC_PaymentMethod_ID(paymentMethodId);
 
-		//	Allocate Payment Method
-		final int allocatePaymenMethodtId = request.getAllocatePaymentId();
-		if (allocatePaymenMethodtId > 0) {
-			PO paymentMethodAllocation = POS.getPaymentTypeAllocationId(allocatePaymenMethodtId, null);
-			if(paymentMethodAllocation != null && paymentMethodAllocation.get_ID() > 0) {
-				payment.setIsOnline(
-					paymentMethodAllocation.get_ValueAsBoolean("IsOnline")
-				);
+		//	Document Type
+		PaymentManagement.setDocumentType(
+			pointOfSalesDefinition,
+			payment,
+			paymentTypeAllocation,
+			transactionName
+		);
 
-				// TODO: Validate with `paymentMethodId` value
-				// if(paymentMethodAllocation.get_ValueAsInt("C_DocTypeTarget_ID") > 0 && !request.getIsRefund()) {
-				// 	documentTypeId = pointOfSalesDefinition.get_ValueAsInt("C_DocTypeTarget_ID");
-				// }
-				// payment.set_ValueOfColumn(
-				// 	I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID,
-				// 	paymentMethodAllocation.get_ValueAsInt(I_C_PaymentMethod.COLUMNNAME_C_PaymentMethod_ID)
-				// );
-			}
-		}
-
-		if(documentTypeId > 0) {
-			payment.setC_DocType_ID(documentTypeId);
-		} else {
-			payment.setC_DocType_ID(!request.getIsRefund());
-		}
 		payment.setAD_Org_ID(salesOrder.getAD_Org_ID());
 		Timestamp date = ValueManager.getDateFromTimestampDate(
 			request.getPaymentDate()
@@ -137,11 +126,17 @@ public class CollectingManagement {
 		Timestamp dateValue = ValueManager.getDateFromTimestampDate(
 			request.getPaymentAccountDate()
 		);
-    	if(dateValue != null) {
-    		payment.setDateAcct(dateValue);
-    	}
-        payment.setTenderType(tenderType);
-        payment.setDescription(Optional.of(request.getDescription()).orElse(salesOrder.getDescription()));
+		if(dateValue != null) {
+			payment.setDateAcct(dateValue);
+		}
+		payment.setTenderType(tenderType);
+		payment.setDescription(
+			Optional.of(
+				request.getDescription()
+			).orElse(
+				salesOrder.getDescription()
+			)
+		);
         payment.setC_BPartner_ID (salesOrder.getC_BPartner_ID());
         payment.setC_Currency_ID(currencyId);
         payment.setC_POS_ID(pointOfSalesDefinition.getC_POS_ID());
@@ -173,17 +168,55 @@ public class CollectingManagement {
 			case MPayment.TENDERTYPE_DirectDebit:
 				break;
 			case MPayment.TENDERTYPE_CreditCard:
+				if (!Util.isEmpty(request.getCreditCardTypeValue(), true)) {
+					payment.setCreditCardType(
+						request.getCreditCardTypeValue()
+					);
+				}
+				if (!Util.isEmpty(request.getCreditCardNumber(), true)) {
+					payment.setCreditCardNumber(
+						request.getCreditCardNumber()
+					);
+				}
+				if (!Util.isEmpty(request.getCreditCardVerificationValue(), true)) {
+					payment.setCreditCardVV(
+						request.getCreditCardVerificationValue()
+					);
+				}
+				payment.setCreditCardExpMM(
+					request.getCreditCardExpirityMonth()
+				);
+				payment.setCreditCardExpYY(
+					request.getCreditCardExpirityYear()
+				);
 				break;
 			case MPayment.TENDERTYPE_MobilePaymentInterbank:
-				payment.setR_PnRef(request.getReferenceNo());
+            case MPayment.TENDERTYPE_Zelle:
+                payment.setR_PnRef(request.getReferenceNo());
 				break;
-			case MPayment.TENDERTYPE_Zelle:
-				payment.setR_PnRef(request.getReferenceNo());
-				break;
-			case MPayment.TENDERTYPE_CreditMemo:
+            case MPayment.TENDERTYPE_CreditMemo:
 				payment.setR_PnRef(request.getReferenceNo());
 				payment.setDocumentNo(request.getReferenceNo());
 				payment.setCheckNo(request.getReferenceNo());
+				payment.set_ValueOfColumn(
+					ColumnsAdded.COLUMNNAME_ECA14_Invoice_Reference_ID,
+					request.getInvoiceId()
+				);
+				break;
+			// Gift Card
+			case "G":
+				if (payment.get_ColumnIndex(ColumnsAdded.COLUMNNAME_ECA14_GiftCard_ID) >= 0) {
+					if (payment.isReceipt()) {
+						GiftCardManagement.processingGiftCard(
+							request.getGiftCardId()
+						);
+					}
+					payment.setR_PnRef(request.getReferenceNo());
+					payment.set_ValueOfColumn(
+						ColumnsAdded.COLUMNNAME_ECA14_GiftCard_ID,
+						request.getGiftCardId()
+					);
+				}
 				break;
 			default:
 				payment.setDescription(request.getDescription());
@@ -206,22 +239,18 @@ public class CollectingManagement {
 		CashUtil.setCurrentDate(payment);
 		if(Util.isEmpty(payment.getDocumentNo(), true)) {
 			String value = DB.getDocumentNo(payment.getC_DocType_ID(), transactionName, false, payment);
-			payment.setDocumentNo(value);
+			if (!Util.isEmpty(value, true)) {
+				payment.setDocumentNo(value);
+			}
 		}
 		//	
 		if(request.getInvoiceReferenceId() > 0) {
 			payment.set_ValueOfColumn(ColumnsAdded.COLUMNNAME_ECA14_Invoice_Reference_ID, request.getInvoiceReferenceId());
 		}
+		if(paymentTypeAllocation.get_ValueAsInt(I_C_Payment.COLUMNNAME_C_CardProvider_ID) > 0) {
+			payment.setC_CardProvider_ID(paymentTypeAllocation.get_ValueAsInt(I_C_Payment.COLUMNNAME_C_CardProvider_ID));
+		}
 		payment.saveEx(transactionName);
-		// if(payment.setPaymentProcessor()) {
-		// 	payment.setIsApproved(false);
-		// 	boolean isOk = payment.processOnline();
-		// 	if(!isOk) {
-		// 		throw new AdempiereException(payment.getErrorMessage());
-		// 	}
-		// 	payment.setIsApproved(true);
-		// 	payment.saveEx();
-		// }
 		return payment;
 	}
 }
