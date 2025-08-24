@@ -247,8 +247,13 @@ public class CollectingManagement {
 		if(request.getInvoiceReferenceId() > 0) {
 			payment.set_ValueOfColumn(ColumnsAdded.COLUMNNAME_ECA14_Invoice_Reference_ID, request.getInvoiceReferenceId());
 		}
+		/*
 		if(paymentTypeAllocation.get_ValueAsInt(I_C_Payment.COLUMNNAME_C_CardProvider_ID) > 0) {
 			payment.setC_CardProvider_ID(paymentTypeAllocation.get_ValueAsInt(I_C_Payment.COLUMNNAME_C_CardProvider_ID));
+		}
+		*/
+		if(paymentTypeAllocation.get_ValueAsInt("C_CardProvider_ID") > 0) {
+			payment.setC_CardProvider_ID(paymentTypeAllocation.get_ValueAsInt("C_CardProvider_ID"));
 		}
 		payment.saveEx(transactionName);
 		return payment;

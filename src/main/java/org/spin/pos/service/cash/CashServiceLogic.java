@@ -72,7 +72,9 @@ import org.spin.backend.grpc.report_management.GenerateReportRequest;
 import org.spin.base.util.RecordUtil;
 import org.spin.grpc.service.ReportManagement;
 import org.spin.grpc.service.core_functionality.CoreFunctionalityConvert;
+/*
 import org.spin.pos.process.inf_POS_Sales_Detail_And_CollectionAbstract;
+*/
 import org.spin.pos.service.pos.POS;
 import org.spin.pos.util.CurrencyCashKey;
 import org.spin.pos.util.PaymentConvertUtil;
@@ -535,7 +537,10 @@ public class CashServiceLogic {
 		MPOS pos = POS.validateAndGetPOS(request.getPosId(), true);
 
 		// inf_POS_Sales_Detail_And_Collection
+		/*
 		final int processId = inf_POS_Sales_Detail_And_CollectionAbstract.getProcessId();
+		*/
+		final int processId = 0;
 		String reportType = "pdf";
 		if (!Util.isEmpty(request.getReportType(), true)) {
 			reportType = request.getReportType();
@@ -571,11 +576,17 @@ public class CashServiceLogic {
 		Value valueDateFrom = builderDateInvoiced.build();
 		Value valueDateTo = builderDateInvoicedTo.build();
 		parameters.putFields(
+			/*
 			inf_POS_Sales_Detail_And_CollectionAbstract.DATEINVOICED,
+			*/
+			"DateInvoiced",
 			valueDateFrom
 		);
 		parameters.putFields(
+			/*
 			inf_POS_Sales_Detail_And_CollectionAbstract.DATEINVOICED + "_To",
+			*/
+			"DateInvoiced_To",
 			valueDateTo
 		);
 
@@ -584,7 +595,10 @@ public class CashServiceLogic {
 		);
 
 		parameters.putFields(
+			/*
 			inf_POS_Sales_Detail_And_CollectionAbstract.C_POS_ID,
+			*/
+			"C_POS_ID",
 			builderPosId.build()
 		);
 
@@ -636,8 +650,8 @@ public class CashServiceLogic {
 			}
 			PO paymentProcessorRun = null;
 			try {
-				PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
 				/*
+				PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
 				if (PaymentProcessorClosing.class.isAssignableFrom(processor.getClass())) {
 					((PaymentProcessorClosing) processor).closeBatch(paymentMethodId, bankStatement.getStatementDate());
 					whereClause = "C_BankStatement_ID = ? AND C_PaymentMethod_ID = ?";
@@ -705,8 +719,9 @@ public class CashServiceLogic {
 				throw new AdempiereException("@C_PaymentProcessor_ID@ @NotFound@");
 			}
 			PO paymentProcessorRun = null;
-			PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
+			PaymentProcessor processor = null;
 			/*
+			PaymentProcessor processor = PaymentProcessor.create(paymentProcessor, bankStatement, paymentMethodId);
 			if (PaymentProcessorStatus.class.isAssignableFrom(processor.getClass())) {
 				((PaymentProcessorStatus) processor).transactionStatus();
 				whereClause = "C_BankStatement_ID = ? AND C_PaymentMethod_ID = ?";
