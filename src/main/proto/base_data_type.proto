@@ -41,9 +41,10 @@ message DocumentAction {
 // Lookup Item
 message LookupItem {
 	int32 id = 1;
-	string table_name = 2;
-	google.protobuf.Struct values = 3;
-	bool is_active = 4;
+	string uuid = 2;
+	string table_name = 3;
+	google.protobuf.Struct values = 4;
+	bool is_active = 5;
 }
 
 message ListLookupItemsRequest {
@@ -56,16 +57,18 @@ message ListLookupItemsRequest {
 	string search_value = 7;
 	string context_attributes = 8;
 	bool is_only_active_records = 9;
+	bool is_without_validation = 10;
+	google.protobuf.Value current_value = 11;
 	// references
-	int32 process_parameter_id = 10;
-	int32 field_id = 11;
-	int32 browse_field_id = 12;
-	int32 reference_id = 13;
-	int32 column_id = 14;
-	string table_name = 15;
-	string column_name = 16;
+	int32 reference_id = 12;
+	string table_name = 13;
+	string column_name = 14;
+	int32 column_id = 15;
+	int32 field_id = 16;
+	int32 process_parameter_id = 17;
+	int32 browse_field_id = 18;
+	int32 display_definition_field_id = 19;
 	//
-	bool is_without_validation = 17;
 }
 
 message ListLookupItemsResponse {
@@ -83,8 +86,9 @@ message KeyValueSelection {
 // Value Object from ADempiere
 message Entity {
 	int32 id = 1;
-	string table_name = 2;
-	google.protobuf.Struct values = 3;
+	string uuid = 2;
+	string table_name = 3;
+	google.protobuf.Struct values = 4;
 }
 
 message ListEntitiesResponse {
@@ -104,18 +108,19 @@ message ProcesInstanceParameter {
 
 message ProcessLog {
 	int32 id = 1;
-	string name = 2;
-	string description = 3;
-	int32 instance_id = 4;
-	bool is_error = 5;
-	string summary = 6;
-	string result_table_name = 7;
-	bool is_processing = 8;
-	google.protobuf.Timestamp last_run = 9;
-	repeated ProcessInfoLog logs = 10;
-	google.protobuf.Struct parameters = 11;
-	ReportOutput output = 12;
-	repeated ProcesInstanceParameter process_intance_parameters = 13;
+	string uuid = 2;
+	string name = 3;
+	string description = 4;
+	int32 instance_id = 5;
+	bool is_error = 6;
+	string summary = 7;
+	string result_table_name = 8;
+	bool is_processing = 9;
+	google.protobuf.Timestamp last_run = 10;
+	repeated ProcessInfoLog logs = 11;
+	google.protobuf.Struct parameters = 12;
+	ReportOutput output = 13;
+	repeated ProcesInstanceParameter process_intance_parameters = 14;
 }
 
 //	BusinessProcess Log result
@@ -128,19 +133,21 @@ message ProcessInfoLog {
 // TODO: Move to report_management
 message ReportOutput {
 	int32 id = 1;
-	string name = 2;
-	string description = 3;
-	string file_name = 4;
-	string output = 5;
-	string mime_type = 6;
-	int64 data_cols = 7;
-	int64 data_rows = 8;
-	string header_name = 9;
-	string footer_name = 10;
-	int32 print_format_id = 11;
-	int32 report_view_id = 12;
-	string table_name = 13;
-	bytes output_stream = 14;
+	string uuid = 2;
+	string name = 3;
+	string description = 4;
+	string file_name = 5;
+	string output = 6;
+	string mime_type = 7;
+	int64 data_cols = 8;
+	int64 data_rows =98;
+	string header_name = 10;
+	string footer_name = 11;
+	int32 print_format_id = 12;
+	int32 report_view_id = 13;
+	string table_name = 14;
+	bytes output_stream = 15;
 	//	Output Type
-	string report_type = 15;
+	string report_type = 16;
+	bool is_direct_print = 17;
 }

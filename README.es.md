@@ -61,7 +61,7 @@ No olvide que para ejecutar el servidor necesita establecer la línea del archiv
 - Ejecutar
 
 ```bash
-./adempiere-all-in-one-server "./resources/standalone.yaml"
+./start-backend.sh "./resources/standalone.yaml"
 ```
 
 
@@ -98,7 +98,8 @@ Para utilizar esta imagen Docker debe tener su motor Docker versión mayor o igu
  * `DB_PORT`: Puerto utilizado por el servidor de base de datos. Predeterminado: `5432`.
  * `DB_NAME`: Nombre de la base de datos que Adempiere-Backend utilizará para conectarse con la base de datos. Por defecto: `adempiere`.
  * `DB_USER`: Usuario de base de datos que Adempiere-Backend utilizará para conectarse con la base de datos. Por defecto: `adempiere`.
- * `DB_PASSWORD`: Contraseña de la base de datos que Adempiere-Backend utilizará para conectarse con la base de datos. Por defecto: `adempiere`.
+ * `DB_PASSWORD`: Contraseña de la base de datos que Adempiere-Backend utilizará para conectarse con la base de datos. Por defecto: `adempiere`. Para mayor seguridad, implementar los secretos con `DB_PASSWORD_FILE`.
+ * `DB_PASSWORD_FILE`: Contraseña de la base de datos que Adempiere-Backend utilizará para conectarse con la base de datos. Esto anula `DB_PASSWORD` pero si no se define ningún secreto será implementado en la contraseña, pero en su lugar se utilizará el valor de la variable de entorno..
  * `IDLE_TIMEOUT`: Establece el tiempo máximo que una conexión puede permanecer sin uso antes de cerrarse para liberar recursos. Por defecto: `300`.
  * `MINIMUM_IDLE`: Establece la cantidad mínima de conexiones que deben mantenerse abiertas y listas para usar, incluso si no se están utilizando actualmente. Esto ayuda a mejorar el rendimiento al reducir el tiempo que lleva obtener una conexión. Por defecto: `1`.
  * `MAXIMUM_POOL_SIZE`: Establece la cantidad máxima de conexiones que pueden estar abiertas al mismo tiempo. Esto ayuda a evitar que el grupo crezca demasiado y utilice demasiada memoria. Por defecto: `10`.
@@ -110,6 +111,7 @@ Para utilizar esta imagen Docker debe tener su motor Docker versión mayor o igu
  * `SERVER_LOG_LEVEL`: Nivel de Bitácora. Por defecto: `WARNING`.
  * `TZ`: (Time Zone) Indica la zona horaria a establecer en el contenedor basado en nginx, el valor por defecto es `America/Caracas` (UTC -4:00).
  * `SYSTEM_LOGO_URL`: Logo de la imagen principal del sistema, mostrada en la pantalla del login.
+ * `JAVA_OPTIONS`: Configuración personalizada de la máquina virtual Java (JVM). Por defecto: `-Xms64M -Xmx1512M`.
 
 ### Construir imagen docker (sólo para desarrollo):
 Primero compile los archivos de salida.

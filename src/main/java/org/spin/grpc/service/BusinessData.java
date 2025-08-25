@@ -14,11 +14,9 @@
  ************************************************************************************/
 package org.spin.grpc.service;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -36,22 +34,10 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.MBrowse;
 import org.adempiere.model.MBrowseField;
 import org.adempiere.model.MViewDefinition;
-import org.compiere.model.MColumn;
-import org.compiere.model.MMenu;
-import org.compiere.model.MPInstance;
-import org.compiere.model.MProcess;
-import org.compiere.model.MProcessPara;
-import org.compiere.model.MTable;
-import org.compiere.model.PO;
-import org.compiere.model.Query;
+import org.compiere.model.*;
 import org.compiere.process.DocAction;
 import org.compiere.process.ProcessInfo;
-import org.compiere.util.CLogger;
-import org.compiere.util.DB;
-import org.compiere.util.Env;
-import org.compiere.util.Msg;
-import org.compiere.util.Trx;
-import org.compiere.util.Util;
+import org.compiere.util.*;
 import org.eevolution.services.dsl.ProcessBuilder;
 import org.spin.backend.grpc.common.BusinessDataGrpc.BusinessDataImplBase;
 import org.spin.backend.grpc.common.CreateEntityRequest;
@@ -73,20 +59,25 @@ import org.spin.base.util.RecordUtil;
 import org.spin.base.workflow.WorkflowUtil;
 import org.spin.dictionary.util.BrowserUtil;
 import org.spin.dictionary.util.DictionaryUtil;
+import org.spin.dictionary.util.WindowUtil;
+import org.spin.eca62.support.IS3;
+import org.spin.eca62.support.ResourceMetadata;
 import org.spin.grpc.service.ui.BrowserLogic;
+import org.spin.model.MADAppRegistration;
 import org.spin.service.grpc.authentication.SessionManager;
 // import org.spin.service.grpc.util.db.CountUtil;
 import org.spin.service.grpc.util.db.LimitUtil;
-import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.query.SortingManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Empty;
-import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import org.spin.util.support.AppSupportHandler;
+import org.spin.util.support.IAppSupport;
 
 /**
  * https://itnext.io/customizing-grpc-generated-code-5909a2551ca1
@@ -200,14 +191,14 @@ public class BusinessData extends BusinessDataImplBase {
 		if(request.getId() <= 0) {
 			throw new AdempiereException("@FillMandatory@ @AD_Process_ID@");
 		}
-		int processId = request.getId();
+		final int processId = request.getId();
 		//	Get Process definition
 		MProcess process = MProcess.get(
 			Env.getCtx(),
 			processId
 		);
 		if(process == null || process.getAD_Process_ID() <= 0) {
-			throw new AdempiereException("@AD_Process_ID@ @NotFound@");
+			throw new AdempiereException("@AD_Process_ID@ (" + processId + ") @NotFound@");
 		}
 
 		// Record/Role access
@@ -232,6 +223,12 @@ public class BusinessData extends BusinessDataImplBase {
 			);
 		}
 
+		//	Add to recent Item
+		DictionaryUtil.addToRecentItem(
+			MMenu.ACTION_Process,
+			process.getAD_Process_ID()
+		);
+
 		ProcessLog.Builder response = ProcessLog.newBuilder()
 			.setId(
 				process.getAD_Process_ID()
@@ -253,9 +250,21 @@ public class BusinessData extends BusinessDataImplBase {
 				}
 			}
 		}
+
+
+		//	browser/window selection by client or generate selection by server
+		List<KeyValueSelection> selectionsList = request.getSelectionsList();
+		boolean isMultiSelection = false;
+		if (process.get_ColumnIndex("SP003_IsMultiSelection") >= 0) {
+			isMultiSelection = process.get_ValueAsBoolean("SP003_IsMultiSelection");
+		}
+
 		PO entity = null;
 		int recordId = request.getRecordId();
-		if (table != null && RecordUtil.isValidId(recordId, table.getAccessLevel())) {
+		if (isMultiSelection && selectionsList != null && !selectionsList.isEmpty() && selectionsList.size() == 1) {
+			// KeyValueSelection oneRow = selectionsList.get(0);
+			// recordId = oneRow.getSelectionId();
+		} else if (table != null && RecordUtil.isValidId(recordId, table.getAccessLevel())) {
 			entity = RecordUtil.getEntity(Env.getCtx(), table.getTableName(), recordId, null);
 			if(entity != null) {
 				recordId = entity.get_ID();
@@ -265,11 +274,11 @@ public class BusinessData extends BusinessDataImplBase {
 		//	Call process builder
 		ProcessBuilder builder = ProcessBuilder.create(Env.getCtx())
 			.process(process.getAD_Process_ID())
+			.withTitle(process.getName())
+			.withWindowNo(0)
 			.withRecordId(tableId, recordId)
 			.withoutPrintPreview()
 			.withoutBatchMode()
-			.withWindowNo(0)
-			.withTitle(process.getName())
 			.withoutTransactionClose()
 		;
 
@@ -284,8 +293,6 @@ public class BusinessData extends BusinessDataImplBase {
 			List<Integer> selectionKeys = new ArrayList<>();
 			LinkedHashMap<Integer, LinkedHashMap<String, Object>> selection = new LinkedHashMap<>();
 
-			//	browser selection by client or generate selection by server
-			List<KeyValueSelection> selectionsList = request.getSelectionsList();
 			if (request.getIsAllSelection()) {
 				// get all records march with browser criteria
 				selectionsList = BrowserLogic.getAllSelectionByCriteria(
@@ -298,10 +305,10 @@ public class BusinessData extends BusinessDataImplBase {
 				throw new AdempiereException("@AD_Browse_ID@ @FillMandatory@ @Selection@");
 			}
 
+			Map<String, Integer> displayTypeColumns = BrowserUtil.getBrowseFieldsSelectionDisplayType(browse);
 			for(KeyValueSelection selectionKey : selectionsList) {
 				selectionKeys.add(selectionKey.getSelectionId());
 				if(selectionKey.getValues().getFieldsCount() > 0) {
-					Map<String, Integer> displayTypeColumns = BrowserUtil.getBrowseFieldsSelectionDisplayType(browse);
 					LinkedHashMap<String, Object> entities = new LinkedHashMap<String, Object>(
 						ValueManager.convertValuesMapToObjects(
 							selectionKey.getValues().getFieldsMap(),
@@ -326,18 +333,49 @@ public class BusinessData extends BusinessDataImplBase {
 			builder.withSelectedRecordsIds(tableSelectionId, selectionKeys, selection)
 				.withSelectedRecordsIds(tableSelectionId, tableAlias, selectionKeys)
 			;
+		} else if (table != null && isMultiSelection) {
+			List<Integer> selectionKeys = new ArrayList<>();
+			LinkedHashMap<Integer, LinkedHashMap<String, Object>> selection = new LinkedHashMap<>();
+			if (selectionsList != null && !selectionsList.isEmpty()) {
+				Map<String, Integer> displayTypeColumns = WindowUtil.getTableColumnsDisplayType(table);
+				for(KeyValueSelection selectionKey : selectionsList) {
+					selectionKeys.add(selectionKey.getSelectionId());
+					if(selectionKey.getValues().getFieldsCount() > 0) {
+						LinkedHashMap<String, Object> entities = new LinkedHashMap<String, Object>(
+							ValueManager.convertValuesMapToObjects(
+								selectionKey.getValues().getFieldsMap(),
+								displayTypeColumns
+							)
+						);
+						selection.put(
+							selectionKey.getSelectionId(),
+							entities
+						);
+					}
+				}
+			}
+
+			if (!selectionKeys.isEmpty()) {
+				builder.withSelectedRecordsIds(table.getAD_Table_ID(), selectionKeys, selection)
+					.withSelectedRecordsIds(table.getAD_Table_ID(), table.getTableName(), selectionKeys)
+				;
+			}
 		}
+
 		//	get document action
 		String documentAction = null;
 		//	Parameters
 		Map<String, Value> parametersList = new HashMap<String, Value>();
 		parametersList.putAll(request.getParameters().getFieldsMap());
 		if(request.getParameters().getFieldsCount() > 0) {
-			List<Entry<String, Value>> parametersListWithoutRange = parametersList.entrySet().parallelStream()
+			List<Entry<String, Value>> parametersListWithoutRange = parametersList
+				.entrySet()
+				.parallelStream()
 				.filter(parameterValue -> {
 					return !parameterValue.getKey().endsWith("_To");
 				})
-				.collect(Collectors.toList());
+				.collect(Collectors.toList())
+			;
 			for(Entry<String, Value> parameter : parametersListWithoutRange) {
 				final String columnName = parameter.getKey();
 				int displayTypeId = -1;
@@ -360,12 +398,16 @@ public class BusinessData extends BusinessDataImplBase {
 				} else {
 					value = ValueManager.getObjectFromValue(parameter.getValue());
 				}
-				Optional<Entry<String, Value>> maybeToParameter = parametersList.entrySet().parallelStream()
+				Optional<Entry<String, Value>> maybeToParameter = parametersList
+					.entrySet()
+					.parallelStream()
 					.filter(parameterValue -> {
 						return parameterValue.getKey().equals(parameter.getKey() + "_To");
 					})
-					.findFirst();
+					.findFirst()
+				;
 				if(value != null) {
+					value = getValidParameterValue(value, displayTypeId);
 					if(maybeToParameter.isPresent()) {
 						Object valueTo = null;
 						if (displayTypeId > 0) {
@@ -373,6 +415,8 @@ public class BusinessData extends BusinessDataImplBase {
 						} else {
 							valueTo = ValueManager.getObjectFromValue(maybeToParameter.get().getValue());
 						}
+						valueTo = getValidParameterValue(valueTo, displayTypeId);
+						//	Get Valid Local file
 						builder.withParameter(columnName, value, valueTo);
 					} else {
 						builder.withParameter(columnName, value);
@@ -404,12 +448,17 @@ public class BusinessData extends BusinessDataImplBase {
 
 			result = builder.getProcessInfo();
 			//	Set error message
-			String summary = Msg.parseTranslation(Env.getCtx(), result.getSummary());
+			String summary = result.getSummary();
 			if(Util.isEmpty(summary, true)) {
 				summary = e.getLocalizedMessage();
 			}
 			result.setSummary(
-				ValueManager.validateNull(summary)
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						summary
+					)
+				)
 			);
 		}
 
@@ -434,12 +483,19 @@ public class BusinessData extends BusinessDataImplBase {
 
 		//	
 		response.setIsError(result.isError());
-		if(!Util.isEmpty(result.getSummary())) {
-			response.setSummary(Msg.parseTranslation(Env.getCtx(), result.getSummary()));
+		if(!Util.isEmpty(result.getSummary(), true)) {
+			response.setSummary(
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						result.getSummary()
+					)
+				)
+			);
 		}
 		//	
 		response.setResultTableName(
-			ValueManager.validateNull(
+			StringManager.getValidString(
 				result.getResultTableName()
 			)
 		);
@@ -452,6 +508,59 @@ public class BusinessData extends BusinessDataImplBase {
 		}
 
 		return response;
+	}
+
+	private static Object getValidParameterValue(Object value, int displayTypeId) {
+		if(value == null) {
+			return null;
+		}
+		//	Get from S3
+		if(displayTypeId == DisplayType.FileName || displayTypeId == DisplayType.FilePath || displayTypeId == DisplayType.FilePathOrName) {
+			//	Push to S3
+			if(!String.class.isAssignableFrom(value.getClass())) {
+				return null;
+			}
+			String fileName = (String) value;
+			//	Push to S3
+			try {
+				MClientInfo clientInfo = MClientInfo.get(Env.getCtx());
+				if(clientInfo.getFileHandler_ID() <= 0) {
+					throw new AdempiereException("@FileHandler_ID@ @NotFound@");
+				}
+				MADAppRegistration genericConnector = MADAppRegistration.getById(Env.getCtx(), clientInfo.getFileHandler_ID(), null);
+				if(genericConnector == null) {
+					throw new AdempiereException("@AD_AppRegistration_ID@ @NotFound@");
+				}
+				//	Load
+				IAppSupport supportedApi = AppSupportHandler.getInstance().getAppSupport(genericConnector);
+				if(supportedApi == null) {
+					throw new AdempiereException("@AD_AppSupport_ID@ @NotFound@");
+				}
+				if(!IS3.class.isAssignableFrom(supportedApi.getClass())) {
+					throw new AdempiereException("@AD_AppSupport_ID@ @Unsupported@");
+				}
+				//	Push it
+				IS3 fileHandler = (IS3) supportedApi;
+				ResourceMetadata resourceMetadata = ResourceMetadata.newInstance()
+					.withClientId(Env.getAD_Client_ID(Env.getCtx()))
+					.withUserId(Env.getAD_User_ID(Env.getCtx()))
+					.withContainerType(ResourceMetadata.ContainerType.RESOURCE)
+					.withContainerId("tmp")
+					.withName(fileName)
+				;
+				InputStream inputStream = fileHandler.getResource(resourceMetadata);
+				if (inputStream == null) {
+					throw new AdempiereException("@InputStream@ @NotFound@");
+				}
+				String tempFolder = System.getProperty("java.io.tmpdir");
+				File tmpFile = new File(tempFolder + File.separator + fileName);
+				Files.copy(inputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				return tmpFile.getAbsolutePath();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+		return value;
 	}
 	
 	/**
@@ -705,17 +814,28 @@ public class BusinessData extends BusinessDataImplBase {
 //			parsedSQL = LimitUtil.getQueryWithLimit(parsedSQL, limit, offset);
 //			//	Add Order By
 //			parsedSQL = parsedSQL + orderByClause;
-//			builder = convertListEntitiesResult(MTable.get(context, criteria.getTableName()), parsedSQL, params);
+//			builder = RecordUtil.convertListEntitiesResult(MTable.get(context, criteria.getTableName()), parsedSQL, params);
 //		}
-		Query query = new Query(context, request.getTableName(), whereClause.toString(), null)
-				.setParameters(params);
+		Query query = new Query(
+			context,
+			request.getTableName(),
+			whereClause.toString(),
+			null
+		)
+			.setParameters(params)
+		;
 		count = query.count();
-		if(!Util.isEmpty(request.getSortBy())) {
-			query.setOrderBy(SortingManager.newInstance(request.getSortBy()).getSotingAsSQL());
+		if(!Util.isEmpty(request.getSortBy(), true)) {
+			query.setOrderBy(
+				SortingManager.newInstance(
+					request.getSortBy()
+				).getSotingAsSQL()
+			);
 		}
 		List<PO> entityList = query
-				.setLimit(limit, offset)
-				.<PO>list();
+			.setLimit(limit, offset)
+			.<PO>list()
+		;
 		//	
 		for(PO entity : entityList) {
 			Entity.Builder valueObject = ConvertUtil.convertEntity(entity);
@@ -728,85 +848,13 @@ public class BusinessData extends BusinessDataImplBase {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		//	Set netxt page
-		builder.setNextPageToken(ValueManager.validateNull(nexPageToken));
+		builder.setNextPageToken(
+			StringManager.getValidString(
+				nexPageToken
+			)
+		);
 		//	Return
 		return builder;
 	}
-	
-	/**
-	 * Convert Entities List
-	 * @param table
-	 * @param sql
-	 * @return
-	 */
-	private ListEntitiesResponse.Builder convertListEntitiesResult(MTable table, String sql, List<Object> params) {
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		ListEntitiesResponse.Builder builder = ListEntitiesResponse.newBuilder();
-		long recordCount = 0;
-		try {
-			LinkedHashMap<String, MColumn> columnsMap = new LinkedHashMap<>();
-			//	Add field to map
-			for(MColumn column: table.getColumnsAsList()) {
-				columnsMap.put(column.getColumnName().toUpperCase(), column);
-			}
-			//	SELECT Key, Value, Name FROM ...
-			pstmt = DB.prepareStatement(sql, null);
-			ParameterUtil.setParametersFromObjectsList(pstmt, params);
 
-			//	Get from Query
-			rs = pstmt.executeQuery();
-			while(rs.next()) {
-				Entity.Builder valueObjectBuilder = Entity.newBuilder();
-				Struct.Builder rowValues = Struct.newBuilder();
-				ResultSetMetaData metaData = rs.getMetaData();
-				for (int index = 1; index <= metaData.getColumnCount(); index++) {
-					try {
-						String columnName = metaData.getColumnName (index);
-						MColumn field = columnsMap.get(columnName.toUpperCase());
-						//	Display Columns
-						if(field == null) {
-							String displayValue = rs.getString(index);
-							Value.Builder displayValueBuilder = ValueManager.getValueFromString(displayValue);
-
-							rowValues.putFields(
-								columnName,
-								displayValueBuilder.build()
-							);
-							continue;
-						}
-						//	From field
-						String fieldColumnName = field.getColumnName();
-						Object value = rs.getObject(index);
-						Value.Builder valueBuilder = ValueManager.getValueFromReference(
-							value,
-							field.getAD_Reference_ID()
-						);
-						if(!valueBuilder.getNullValue().equals(com.google.protobuf.NullValue.NULL_VALUE)) {
-							rowValues.putFields(
-								fieldColumnName,
-								valueBuilder.build()
-							);
-						}
-					} catch (Exception e) {
-						log.severe(e.getLocalizedMessage());
-						e.printStackTrace();
-					}
-				}
-				//	
-				valueObjectBuilder.setValues(rowValues);
-				builder.addRecords(valueObjectBuilder.build());
-				recordCount++;
-			}
-		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
-			e.printStackTrace();
-		} finally {
-			DB.close(rs, pstmt);
-		}
-		//	Set record counts
-		builder.setRecordCount(recordCount);
-		//	Return
-		return builder;
-	}
 }

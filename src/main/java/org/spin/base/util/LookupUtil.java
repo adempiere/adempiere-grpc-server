@@ -20,6 +20,7 @@ import org.compiere.model.MRefList;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
 import org.spin.backend.grpc.common.LookupItem;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -103,6 +104,11 @@ public class LookupUtil {
 			LookupUtil.UUID_COLUMN_KEY,
 			ValueManager.getValueFromString(uuidValue).build()
 		);
+		builder.setUuid(
+			StringManager.getValidString(
+				uuidValue
+			)
+		);
 
 		builder.setValues(values);
 		return builder;
@@ -123,6 +129,11 @@ public class LookupUtil {
 		}
 
 		builder.setId(refList.getAD_Ref_List_ID())
+			.setUuid(
+				StringManager.getValidString(
+					refList.getUUID()
+				)
+			)
 			.setTableName(I_AD_Ref_List.Table_Name)
 		;
 

@@ -73,6 +73,7 @@ import org.spin.grpc.service.field.field_management.FieldManagementLogic;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -243,7 +244,7 @@ public abstract class BankStatementMatchServiceLogic {
 		ListPaymentsResponse.Builder builderList = ListPaymentsResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -392,8 +393,10 @@ public abstract class BankStatementMatchServiceLogic {
 				//	put on hash
 				matchedPaymentHashMap.put(currentBankStatementImport.getC_Payment_ID(), currentBankStatementImport);
 				// if (!(currentBankStatementImport.isProcessed() || currentBankStatementImport.isProcessing())) {
-					// TODO: Change to automatic match flag
-					currentBankStatementImport.setEftMemo("Y");
+					currentBankStatementImport.set_ValueOfColumn(
+						"IsMatched",
+						true
+					);
 					currentBankStatementImport.save();
 				// }
 				matched++;
@@ -408,7 +411,10 @@ public abstract class BankStatementMatchServiceLogic {
 						matchedPaymentHashMap.keySet().stream().collect(Collectors.toList())
 					);
 					if (info == null || !info.isMatched()) {
-						currentBankStatementImport.setEftMemo("N");
+						currentBankStatementImport.set_ValueOfColumn(
+							"IsMatched",
+							false
+						);
 						currentBankStatementImport.save();
 						continue;
 					}
@@ -427,8 +433,10 @@ public abstract class BankStatementMatchServiceLogic {
 						currentBankStatementImport.setC_BPartner_ID(info.getC_BPartner_ID());
 					}
 					if (!(currentBankStatementImport.isProcessed() || currentBankStatementImport.isProcessing())) {
-						// TODO: Change to automatic match flag
-						currentBankStatementImport.setEftMemo("Y");
+						currentBankStatementImport.set_ValueOfColumn(
+							"IsMatched",
+							true
+						);
 						currentBankStatementImport.save();
 					}
 
@@ -436,8 +444,10 @@ public abstract class BankStatementMatchServiceLogic {
 					matchedPaymentHashMap.put(currentBankStatementImport.getC_Payment_ID(), currentBankStatementImport);
 					matched++;
 				} else {
-					// TODO: Change to automatic match flag
-					currentBankStatementImport.setEftMemo(null);
+					currentBankStatementImport.set_ValueOfColumn(
+						"IsMatched",
+						false
+					);
 					currentBankStatementImport.save();
 				}
 			}	//	for all matchers
@@ -482,7 +492,7 @@ public abstract class BankStatementMatchServiceLogic {
 		ListBankStatementsResponse.Builder builderList = ListBankStatementsResponse.newBuilder()
 			.setRecordCount(recordCount)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -570,7 +580,11 @@ public abstract class BankStatementMatchServiceLogic {
 		});
 
 		MatchPaymentsResponse.Builder builder = MatchPaymentsResponse.newBuilder()
-			.setMessage(String.valueOf(result.get()))
+			.setMessage(
+				String.valueOf(
+					result.get()
+				)
+			)
 		;
 
 		return builder;
@@ -593,7 +607,11 @@ public abstract class BankStatementMatchServiceLogic {
 		});
 
 		UnmatchPaymentsResponse.Builder builder = UnmatchPaymentsResponse.newBuilder()
-			.setMessage(String.valueOf(result.get()))
+			.setMessage(
+				String.valueOf(
+					result.get()
+				)
+			)
 		;
 
 		return builder;
@@ -704,7 +722,13 @@ public abstract class BankStatementMatchServiceLogic {
 			});
 
 		builder.setMessage(
-			Msg.translate(Env.getCtx(), "BankStatementMatch.MatchedProcessed") + ": " + processed
+			StringManager.getValidString(
+				Msg.parseTranslation(
+					Env.getCtx(),
+					"BankStatementMatch.MatchedProcessed"
+				)
+				+ ": " + processed
+			)
 		);
 
 		return builder;

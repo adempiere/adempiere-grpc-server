@@ -20,18 +20,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.model.MOrder;
 import org.compiere.model.MPOS;
-import org.compiere.process.DocAction;
 import org.compiere.util.Env;
 import org.compiere.util.Trx;
 import org.compiere.util.Util;
 import org.spin.base.util.DocumentUtil;
+import org.spin.pos.service.cash.CashManagement;
 
 /**
  * This class was created for Reverse Sales Transaction
  * @author Yamel Senih, ysenih@erpya.com , http://www.erpya.com
  */
 public class ReverseSalesTransaction {
-	
+
 	/**
 	 * Create a Return order and cancel all payments
 	 * @param pos
@@ -39,7 +39,7 @@ public class ReverseSalesTransaction {
 	 * @param description
 	 * @return
 	 */
-	public static MOrder returnCompleteOrder(MPOS pos, int sourceOrderId, String description) {
+	public static MOrder returnSalesOrder(MPOS pos, int sourceOrderId, String description, boolean processDocuments) {
 		AtomicReference<MOrder> returnOrderReference = new AtomicReference<MOrder>();
 		Trx.run(transactionName -> {
 			MOrder sourceOrder = new MOrder(Env.getCtx(), sourceOrderId, transactionName);
@@ -50,47 +50,62 @@ public class ReverseSalesTransaction {
 					|| !OrderUtil.isValidOrder(sourceOrder)) {
 				throw new AdempiereException("@ActionNotAllowedHere@");
 			}
-			MOrder returnOrder = createReturnOrder(pos, sourceOrder, transactionName);
-			if(!Util.isEmpty(description)) {
+
+			CashManagement.validatePreviousCashClosing(pos, sourceOrder.getDateOrdered(), transactionName);
+
+			MOrder returnOrder = RMAUtil.copyRMAFromOrder(pos, sourceOrder, transactionName);
+			if(!Util.isEmpty(description, true)) {
 				returnOrder.setDescription(description);
-				returnOrder.saveEx();
+			} else {
+				returnOrder.setDescription(sourceOrder.getDocumentNo());
 			}
-			//	Close all
-	        if(!sourceOrder.processIt(MOrder.DOCACTION_Close)) {
-	        	throw new AdempiereException(sourceOrder.getProcessMsg());
-	        }
-	        sourceOrder.saveEx();
-	        if(!returnOrder.processIt(MOrder.DOCACTION_Close)) {
-	        	throw new AdempiereException(returnOrder.getProcessMsg());
-	        }
-        	returnOrder.saveEx();
-        	OrderManagement.processPayments(returnOrder, pos, true, transactionName);
+			returnOrder.saveEx();
+			RMAUtil.createReturnOrderLines(sourceOrder, returnOrder, transactionName);
+			RMAUtil.createReversedPayments(pos, sourceOrder, returnOrder, transactionName);
+
+			//	Process return Order
+			if (processDocuments) {
+				// process and generate documents
+				returnOrder = processReverseSalesOrder(
+					pos,
+					sourceOrder,
+					returnOrder,
+					transactionName
+				);
+			}
 			returnOrderReference.set(returnOrder);
 		});
 		return returnOrderReference.get();
 	}
-	
-    /**
-     * Create return order
-     * @param pos
-     * @param sourceOrder
-     * @param transactionName
-     * @return
-     */
-    private static MOrder createReturnOrder(MPOS pos, MOrder sourceOrder, String transactionName) {
-    	MOrder returnOrder = RMAUtil.copyRMAFromOrder(pos, sourceOrder, transactionName);
-    	RMAUtil.createReturnOrderLines(sourceOrder, returnOrder, transactionName);
-        //	Process return Order
-        if(!returnOrder.processIt(DocAction.ACTION_Complete)) {
-        	throw new AdempiereException("@ProcessFailed@ :" + returnOrder.getProcessMsg());
-        }
+
+	/**
+	 * Create return order
+	 * @param pos
+	 * @param sourceOrder
+	 * @param transactionName
+	 * @return
+	 */
+	public static MOrder processReverseSalesOrder(MPOS pos, MOrder sourceOrder, MOrder returnOrder, String transactionName) {
+		CashManagement.validatePreviousCashClosing(pos, sourceOrder.getDateOrdered(), transactionName);
+
+		//	Close all
+		if(!sourceOrder.processIt(MOrder.DOCACTION_Close)) {
+			throw new AdempiereException("@ProcessFailed@ :" + sourceOrder.getProcessMsg());
+		}
+		sourceOrder.saveEx();
+		if(!returnOrder.processIt(MOrder.DOCACTION_Close)) {
+			throw new AdempiereException("@ProcessFailed@ :" + returnOrder.getProcessMsg());
+		}
 		returnOrder.saveEx();
-        //	Generate Return
+
+		//	Generate Return
 		RMAUtil.generateReturnFromRMA(returnOrder, transactionName);
-        //	Generate Credit Memo
+		//	Generate Credit Memo
 		RMAUtil.generateCreditMemoFromRMA(returnOrder, transactionName);
-        //	Return all payments
-		RMAUtil.createReversedPayments(pos, sourceOrder, returnOrder, transactionName);
+
+		OrderManagement.processPayments(returnOrder, pos, true, transactionName);
+
 		return returnOrder;
-    }
+	}
+
 }

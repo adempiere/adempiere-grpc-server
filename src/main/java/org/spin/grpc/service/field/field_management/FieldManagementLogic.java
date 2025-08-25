@@ -31,12 +31,12 @@ import java.util.stream.Collectors;
 
 import org.adempiere.core.domains.models.I_AD_Browse_Field;
 import org.adempiere.core.domains.models.I_AD_ChangeLog;
+import org.adempiere.core.domains.models.I_AD_Column;
 import org.adempiere.core.domains.models.I_AD_Element;
 import org.adempiere.core.domains.models.I_AD_Field;
 import org.adempiere.core.domains.models.I_AD_Process_Para;
 import org.adempiere.core.domains.models.I_AD_Tab;
 import org.adempiere.core.domains.models.I_AD_Table;
-import org.adempiere.core.domains.models.X_AD_Reference;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.MBrowseField;
 import org.adempiere.model.MViewColumn;
@@ -49,6 +49,8 @@ import org.compiere.model.MRole;
 import org.compiere.model.MTab;
 import org.compiere.model.MTable;
 import org.compiere.model.MWindow;
+import org.compiere.model.PO;
+import org.compiere.model.Query;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
 import org.compiere.util.DisplayType;
@@ -79,6 +81,7 @@ import org.spin.service.grpc.util.db.CountUtil;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.db.ParameterUtil;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -218,6 +221,47 @@ public class FieldManagementLogic {
 			validationRuleId = column.getAD_Val_Rule_ID();
 			columnName = column.getColumnName();
 			defaultValue = column.getDefaultValue();
+		} else if (request.getDisplayDefinitionFieldId() > 0) {
+			PO fieldDefinition = new Query(
+				Env.getCtx(),
+				"SP010_Field",
+				"SP010_Field_ID = ?",
+				null
+			)
+				.setParameters(request.getDisplayDefinitionFieldId())
+				.first()
+			;
+			if (fieldDefinition == null || fieldDefinition.get_ID() <= 0) {
+				throw new AdempiereException("@SP010_DisplayDefinition_ID@ @SP010_Field_ID@ @NotFound@");
+			}
+			MColumn column = MColumn.get(
+				Env.getCtx(),
+				fieldDefinition.get_ValueAsInt(
+					I_AD_Column.COLUMNNAME_AD_Column_ID
+				)
+			);
+			columnName = column.getColumnName();
+
+			//	Display Type
+			referenceId = fieldDefinition.get_ValueAsInt(I_AD_Column.COLUMNNAME_AD_Reference_ID);
+			if (referenceId <= 0) {
+				referenceId = column.getAD_Reference_ID();
+			}
+
+			referenceValueId = fieldDefinition.get_ValueAsInt(I_AD_Column.COLUMNNAME_AD_Reference_Value_ID);
+			if(referenceValueId <= 0) {
+				referenceValueId = column.getAD_Reference_Value_ID();
+			}
+
+			validationRuleId = fieldDefinition.get_ValueAsInt(I_AD_Column.COLUMNNAME_AD_Val_Rule_ID);
+			if (validationRuleId <= 0) {
+				validationRuleId = column.getAD_Val_Rule_ID();
+			}
+
+			defaultValue = fieldDefinition.get_ValueAsString(I_AD_Column.COLUMNNAME_DefaultValue);
+			if (Util.isEmpty(defaultValue, true)) {
+				defaultValue = column.getDefaultValue();
+			}
 		} else {
 			throw new AdempiereException(
 				"@AD_Reference_ID@ / @AD_Column_ID@ / @AD_Table_ID@ / @AD_Field_ID@ / @AD_Process_Para_ID@ / @AD_Browse_Field_ID@ / @IsMandatory@"
@@ -228,6 +272,7 @@ public class FieldManagementLogic {
 		if (Optional.ofNullable(request.getValue()).isPresent()
 			&& !Util.isEmpty(request.getValue().getStringValue())) {
 			// URL decode to change characteres
+			// final String overwriteValue = ValueManager.getDecodeUrl(defaultValue);
 			final String overwriteValue = request.getValue().getStringValue();
 			defaultValue = overwriteValue;
 		}
@@ -271,8 +316,14 @@ public class FieldManagementLogic {
 			windowNo, context, contextAttributes, true
 		);
 
-		if(defaultValue.trim().startsWith("@SQL=")) {
-			String sqlDefaultValue = defaultValue.replace("@SQL=", "");
+		final String sqlPattern = "^(@SQL)\\s*=";
+		Pattern sqlContextPattern = Pattern.compile(
+			sqlPattern,
+			Pattern.CASE_INSENSITIVE
+		);
+		Matcher sqlMatcher = sqlContextPattern.matcher(defaultValue.trim());
+		if(sqlMatcher.find()) {
+			String sqlDefaultValue = defaultValue.replaceFirst(sqlPattern, "");
 			sqlDefaultValue = Env.parseContext(context, windowNo, sqlDefaultValue, false);
 			if (Util.isEmpty(sqlDefaultValue, true)) {
 				log.warning("@SQL@ @Unparseable@ " + sqlDefaultValue);
@@ -300,20 +351,37 @@ public class FieldManagementLogic {
 		} else if (DisplayType.isNumeric(displayTypeId)) {
 			defaultValueAsObject = NumberManager.getIntegerFromObject(defaultValueAsObject);
 		}
-		if (ReferenceUtil.validateReference(displayTypeId) || DisplayType.Button == displayTypeId) {
-			if (displayTypeId == DisplayType.Button && referenceValueId > 0) {
-				//	Reference Value
-				X_AD_Reference reference = new X_AD_Reference(Env.getCtx(), referenceValueId, null);
-				if (reference != null && reference.getAD_Reference_ID() > 0) {
-					// overwrite display type to Table or List
-					if (X_AD_Reference.VALIDATIONTYPE_TableValidation.equals(reference.getValidationType())) {
-						displayTypeId = DisplayType.Table;
-					} else {
-						displayTypeId = DisplayType.List;
-					}
-				}
-			}
 
+		// overwrite display type `Button` to `List`, example `PaymentRule` or `Posted`
+		displayTypeId = ReferenceUtil.overwriteDisplayType(
+			displayTypeId,
+			referenceValueId
+		);
+		if (DisplayType.Button == displayTypeId) {
+			if (columnName.equals(I_AD_ChangeLog.COLUMNNAME_Record_ID)) {
+				Integer integerValue = NumberManager.getIntegerFromObject(defaultValueAsObject);
+				if (integerValue != null) {
+					defaultValueAsObject = integerValue.intValue();
+				} else {
+					defaultValueAsObject = 0;
+				}
+				// defaultValueAsObject = NumberManager.getIntFromObject(defaultValueAsObject);
+				int tableId = Env.getContextAsInt(context, windowNo, I_AD_Table.COLUMNNAME_AD_Table_ID);
+				MTable table = MTable.get(context, tableId);
+				String tableKeyColumn = table.getTableName() + "_ID";
+				columnName = tableKeyColumn;
+				// overwrite display type to Table Direct
+				displayTypeId = DisplayType.TableDir;
+			} else {
+				values.putFields(
+					columnName,
+					ValueManager.getValueFromObject(defaultValueAsObject).build()
+				);
+				builder.setValues(values);
+				return builder;
+			}
+		}
+		if (ReferenceUtil.validateReference(displayTypeId)) {
 			if (DisplayType.List == displayTypeId) {
 				// (') (text) (') or (") (text) (")
 				String singleQuotesPattern = "('|\")(\\w+)('|\")";
@@ -341,25 +409,6 @@ public class FieldManagementLogic {
 				);
 				builder.setId(referenceList.getAD_Ref_List_ID());
 			} else {
-				if (DisplayType.Button == displayTypeId) {
-					if (columnName.equals(I_AD_ChangeLog.COLUMNNAME_Record_ID)) {
-						defaultValueAsObject = Integer.valueOf(defaultValueAsObject.toString());
-						int tableId = Env.getContextAsInt(context, windowNo, I_AD_Table.COLUMNNAME_AD_Table_ID);
-						MTable table = MTable.get(context, tableId);
-						String tableKeyColumn = table.getTableName() + "_ID";
-						columnName = tableKeyColumn;
-						// overwrite display type to Table Direct
-						displayTypeId = DisplayType.TableDir;
-					} else {
-						values.putFields(
-							columnName,
-							ValueManager.getValueFromObject(defaultValueAsObject).build()
-						);
-						builder.setValues(values);
-						return builder;
-					}
-				}
-
 				MLookupInfo lookupInfo = ReferenceUtil.getReferenceLookupInfo(
 					displayTypeId,
 					referenceValueId,
@@ -495,6 +544,9 @@ public class FieldManagementLogic {
 			request.getColumnId(),
 			request.getColumnName(),
 			request.getTableName(),
+			request.getDisplayDefinitionFieldId(),
+			0,
+			null,
 			request.getIsWithoutValidation()
 		);
 		if (reference == null) {
@@ -637,7 +689,9 @@ public class FieldManagementLogic {
 					)
 				);
 				valueObject.setTableName(
-					ValueManager.validateNull(reference.TableName)
+					StringManager.getValidString(
+						reference.TableName
+					)
 				);
 				builder.addRecords(valueObject.build());
 			}
@@ -650,7 +704,9 @@ public class FieldManagementLogic {
 		//	
 		builder.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(
+					nexPageToken
+				)
 			)
 		;
 		//	Return
@@ -673,6 +729,9 @@ public class FieldManagementLogic {
 			request.getColumnId(),
 			request.getColumnName(),
 			request.getTableName(),
+			request.getDisplayDefinitionFieldId(),
+			0,
+			null,
 			request.getIsWithoutValidation()
 		);
 
@@ -780,7 +839,9 @@ public class FieldManagementLogic {
 			nexPageToken = LimitUtil.getPagePrefix(SessionManager.getSessionUuid()) + (pageNumber + 1);
 		}
 		builder.setNextPageToken(
-			ValueManager.validateNull(nexPageToken)
+			StringManager.getValidString(
+				nexPageToken
+			)
 		);
 
 		return builder;
@@ -818,12 +879,12 @@ public class FieldManagementLogic {
 		);
 
 		builderList.setTableName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					lookupInfo.TableName
 				)
 			)
 			.setKeyColumnName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					lookupInfo.KeyColumn
 				)
 			)
@@ -831,7 +892,7 @@ public class FieldManagementLogic {
 				keyColumnsList
 			)
 			.setDisplayColumnName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					lookupInfo.DisplayColumn
 				)
 			)
@@ -845,7 +906,8 @@ public class FieldManagementLogic {
 			ZoomWindow.Builder windowSalesBuilder = FieldManagementConvert.convertZoomWindow(
 				context,
 				lookupInfo.ZoomWindow,
-				lookupInfo.TableName
+				lookupInfo.TableName,
+				false
 			);
 			builderList.addZoomWindows(
 				windowSalesBuilder.build()
@@ -856,7 +918,8 @@ public class FieldManagementLogic {
 			ZoomWindow.Builder windowPurchaseBuilder = FieldManagementConvert.convertZoomWindow(
 				context,
 				lookupInfo.ZoomWindowPO,
-				lookupInfo.TableName
+				lookupInfo.TableName,
+				true
 			);
 			builderList.addZoomWindows(
 				windowPurchaseBuilder.build()
@@ -904,8 +967,8 @@ public class FieldManagementLogic {
 		}
 
 		List<MTab> tabsList = Arrays.asList(
-				window.getTabs(false, null)
-			)
+			window.getTabs(false, null)
+		)
 			.stream()
 			.filter(tabItem -> {
 				return tabItem.isActive();
@@ -938,17 +1001,17 @@ public class FieldManagementLogic {
 				parentTab.getAD_Tab_ID()
 			)
 			.setParentTabUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					parentTab.getUUID()
 				)
 			)
 			.setKeyColumn(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					parentKeyColum
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					parentTab.get_Translation(
 						I_AD_Tab.COLUMNNAME_Name
 					)

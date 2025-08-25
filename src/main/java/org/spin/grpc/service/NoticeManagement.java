@@ -22,13 +22,16 @@ import java.util.List;
 import org.adempiere.core.domains.models.I_AD_Note;
 import org.adempiere.core.domains.models.I_AD_User;
 import org.adempiere.exceptions.AdempiereException;
+import org.compiere.model.MClient;
 import org.compiere.model.MNote;
+import org.compiere.model.MOrg;
 import org.compiere.model.MRole;
 import org.compiere.model.MTable;
 import org.compiere.model.MUser;
 import org.compiere.model.Query;
 import org.compiere.util.CLogger;
 import org.compiere.util.Env;
+import org.compiere.util.Msg;
 import org.spin.backend.grpc.common.ProcessLog;
 import org.spin.backend.grpc.common.RunBusinessProcessRequest;
 import org.spin.backend.grpc.notice_management.AcknowledgeNoticeRequest;
@@ -44,6 +47,7 @@ import org.spin.backend.grpc.notice_management.User;
 import org.spin.backend.grpc.notice_management.NoticeManagementGrpc.NoticeManagementImplBase;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -79,26 +83,33 @@ public class NoticeManagement extends NoticeManagementImplBase {
 				user.getAD_User_ID()
 			)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					user.getUUID()
 				)
 			)
 			.setValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					user.getValue()
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					user.getName()
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					user.getDescription()
 				)
 			)
 		;
+		// client of user record
+		MClient clientUser = MClient.get(Env.getCtx(), user.getAD_Client_ID());
+		builder.setClientUuid(
+			StringManager.getValidString(
+				clientUser.getUUID()
+			)
+		);
 		return builder;
 	}
 
@@ -121,7 +132,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 		}
 		builder.setId(notice.getAD_Note_ID())
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					notice.getUUID()
 				)
 			)
@@ -131,8 +142,11 @@ public class NoticeManagement extends NoticeManagementImplBase {
 				)
 			)
 			.setMessage(
-				ValueManager.validateNull(
-					notice.getMessage()
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						notice.getMessage()
+					)
 				)
 			)
 			.setUser(
@@ -140,27 +154,21 @@ public class NoticeManagement extends NoticeManagementImplBase {
 					notice.getAD_User_ID()
 				)
 			)
-			.setTableName(
-				MTable.getTableName(
-					Env.getCtx(),
-					notice.getAD_Table_ID()
-				)
-			)
 			.setRecordId(
 				notice.getRecord_ID()
 			)
 			.setReference(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					notice.getReference()
 				)
 			)
 			.setTextMessage(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					notice.getTextMsg()
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					notice.getDescription()
 				)
 			)
@@ -168,6 +176,32 @@ public class NoticeManagement extends NoticeManagementImplBase {
 				notice.isProcessed()
 			)
 		;
+
+		MOrg organization = MOrg.get(Env.getCtx(), 0);
+		if (organization == null) {
+			organization = new MOrg(Env.getCtx(), notice.getAD_Org_ID(), null);
+		}
+		if (organization != null && organization.getAD_Org_ID() >= 0) {
+			builder.setOrganization(
+				StringManager.getValidString(
+					organization.getDisplayValue()
+				)
+			);
+		}
+
+		MTable table = MTable.get(Env.getCtx(), notice.getAD_Table_ID());
+		if (table != null && table.getAD_Table_ID() > 0) {
+			builder.setTableId(
+				table.getAD_Table_ID()
+				)
+				.setTableName(
+					StringManager.getValidString(
+						table.getTableName()
+					)
+				)
+			;
+		}
+
 		return builder;
 	}
 
@@ -182,7 +216,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 			responseObserver.onNext(builderList.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -226,7 +260,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 		ListNoticesResponse.Builder builderList = ListNoticesResponse.newBuilder()
 			.setRecordCount(recordCount)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -254,7 +288,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -292,7 +326,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 			responseObserver.onNext(builderList.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -336,7 +370,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 		ListUsersResponse.Builder builderList = ListUsersResponse.newBuilder()
 			.setRecordCount(recordCount)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -364,7 +398,7 @@ public class NoticeManagement extends NoticeManagementImplBase {
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -403,7 +437,12 @@ public class NoticeManagement extends NoticeManagementImplBase {
 		// Response
 		DeleteNoticesResponse.Builder builder = DeleteNoticesResponse.newBuilder()
 			.setSummary(
-				processLog.getSummary()
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						processLog.getSummary()
+					)
+				)
 			)
 			.addAllLogs(
 				processLog.getLogsList()

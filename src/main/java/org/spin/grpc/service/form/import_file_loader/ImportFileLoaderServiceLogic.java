@@ -13,15 +13,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.form.import_file_loader;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.adempiere.core.domains.models.I_AD_ImpFormat;
@@ -42,8 +42,6 @@ import org.compiere.util.Env;
 import org.compiere.util.Ini;
 import org.compiere.util.Msg;
 import org.compiere.util.Util;
-import org.spin.backend.grpc.common.Entity;
-import org.spin.backend.grpc.common.ListEntitiesResponse;
 import org.spin.backend.grpc.common.ListLookupItemsResponse;
 import org.spin.backend.grpc.common.LookupItem;
 import org.spin.backend.grpc.common.ProcessLog;
@@ -54,6 +52,7 @@ import org.spin.backend.grpc.form.import_file_loader.ImportTable;
 import org.spin.backend.grpc.form.import_file_loader.ListCharsetsRequest;
 import org.spin.backend.grpc.form.import_file_loader.ListClientImportFormatsRequest;
 import org.spin.backend.grpc.form.import_file_loader.ListFilePreviewRequest;
+import org.spin.backend.grpc.form.import_file_loader.ListFilePreviewResponse;
 import org.spin.backend.grpc.form.import_file_loader.ListImportFormatsRequest;
 import org.spin.backend.grpc.form.import_file_loader.ListImportProcessesRequest;
 import org.spin.backend.grpc.form.import_file_loader.ListImportTablesRequest;
@@ -68,6 +67,9 @@ import org.spin.eca62.support.ResourceMetadata;
 import org.spin.grpc.service.BusinessData;
 import org.spin.grpc.service.field.field_management.FieldManagementLogic;
 import org.spin.model.MADAppRegistration;
+import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
+import org.spin.service.grpc.util.value.TimeManager;
 import org.spin.service.grpc.util.value.ValueManager;
 import org.spin.util.support.AppSupportHandler;
 import org.spin.util.support.IAppSupport;
@@ -335,9 +337,18 @@ public class ImportFileLoaderServiceLogic {
 		//	Clear
 		data.clear();
 
-		String message = Msg.parseTranslation(Env.getCtx(), "@FileImportR/I@") + " (" + totalRows + " / " + importedRows + "#)";
+		String message = Msg.parseTranslation(
+				Env.getCtx(),
+				"@FileImportR/I@"
+			)
+			+ " (" + totalRows + " / " + importedRows + "#)"
+		;
 		SaveRecordsResponse.Builder builder = SaveRecordsResponse.newBuilder()
-			.setMessage(message)
+			.setMessage(
+				StringManager.getValidString(
+					message
+				)
+			)
 			.setTotal(importedRows)
 		;
 
@@ -373,8 +384,6 @@ public class ImportFileLoaderServiceLogic {
 		}
 		return imported;
 	}
-
-
 
 
 	/**
@@ -462,7 +471,8 @@ public class ImportFileLoaderServiceLogic {
 	}   //  parseFlexFormat
 
 
-	public static ListEntitiesResponse.Builder listFilePreview(ListFilePreviewRequest request) throws Exception {
+
+	public static ListFilePreviewResponse.Builder listFilePreview(ListFilePreviewRequest request) throws Exception {
 		MImpFormat importFormat = validateAndGetImportFormat(request.getImportFormatId());
 		//	Get class from parent
 		ImpFormat format = ImpFormat.load(importFormat.getName());
@@ -477,12 +487,6 @@ public class ImportFileLoaderServiceLogic {
 			throw new AdempiereException("@FileName@ @NotFound@");
 		}
 
-
-		String charsetValue = request.getCharset();
-		if (Util.isEmpty(charsetValue, true) || !Charset.isSupported(charsetValue)) {
-			charsetValue = Charset.defaultCharset().name();
-		}
-		Charset charset = Charset.forName(charsetValue);
 		MClientInfo clientInfo = MClientInfo.get(Env.getCtx());
 		if (clientInfo == null) {
 			throw new AdempiereException("@ClientInfo@");
@@ -510,13 +514,21 @@ public class ImportFileLoaderServiceLogic {
 		//	Get it
 		IS3 fileHandler = (IS3) supportedApi;
 		
-		//  Resource 
+		// Resource
 		ResourceMetadata resourceMetadata = ResourceMetadata.newInstance()
-					.withResourceName(fileName);
+			.withResourceName(fileName)
+		;
 		InputStream inputStream = fileHandler.getResource(resourceMetadata);
 		if (inputStream == null) {
 			throw new AdempiereException("@InputStream@ @NotFound@");
 		}
+
+		// Charset
+		String charsetValue = request.getCharset();
+		if (Util.isEmpty(charsetValue, true) || !Charset.isSupported(charsetValue)) {
+			charsetValue = Charset.defaultCharset().name();
+		}
+		Charset charset = Charset.forName(charsetValue);
 
 		InputStreamReader inputStreamReader = new InputStreamReader(inputStream, charset);
 		BufferedReader in = new BufferedReader(inputStreamReader, 10240);
@@ -535,16 +547,18 @@ public class ImportFileLoaderServiceLogic {
 		}
 		in.close();
 
-		ListEntitiesResponse.Builder builderList = ListEntitiesResponse.newBuilder()
-			.setRecordCount(count)
-		;
-
 		MTable table = MTable.get(Env.getCtx(), importFormat.getAD_Table_ID());
 
+		ListFilePreviewResponse.Builder builderList = ListFilePreviewResponse.newBuilder()
+			.setRecordCount(count)
+			.setTableName(
+				StringManager.getValidString(
+					table.getTableName()
+				)
+			)
+		;
+
 		data.forEach(line -> {
-			Entity.Builder entitBuilder = Entity.newBuilder()
-				.setTableName(table.getTableName())
-			;
 			Struct.Builder lineValues = Struct.newBuilder();
 
 			for (int i = 0; i < format.getRowCount(); i++) {
@@ -561,6 +575,8 @@ public class ImportFileLoaderServiceLogic {
 						info = line.substring(row.getStartNo()-1, row.getEndNo());
 					}
 				} else {
+					// TODO: Delete this redundant method with accept the changes on https://github.com/adempiere/adempiere/pull/4125
+					// info = format.parseFlexFormat(line, format.getFormatType(), row.getStartNo());
 					info = parseFlexFormat(line, format.getFormatType(), row.getStartNo(), format.getSeparatorChar());
 				}
 
@@ -572,36 +588,39 @@ public class ImportFileLoaderServiceLogic {
 						info = "";
 					}
 				}
-				String entry = info;
-
+				String entry = row.parse(info);
 				Value.Builder valueBuilder = Value.newBuilder();
-				if (row.isDate()) {
-					Timestamp dateValue = Timestamp.valueOf(entry);
-					valueBuilder = ValueManager.getValueFromTimestamp(dateValue);
-				} else if (row.isNumber()) {
-					BigDecimal numberValue = null;
-					if (!Util.isEmpty(entry, true)) {
-						numberValue = new BigDecimal(entry);
-						if (row.isDivideBy100()) {
-							numberValue = numberValue.divide(
-								BigDecimal.valueOf(100)
-							);
+				if(!Util.isEmpty(entry)) {
+					try {
+						if (row.isDate()) {
+							Timestamp dateValue = TimeManager.getTimestampFromString(entry);
+							valueBuilder = ValueManager.getValueFromTimestamp(dateValue);
+						} else if (row.isNumber()) {
+							BigDecimal numberValue = null;
+							if (!Util.isEmpty(entry, true)) {
+								numberValue = NumberManager.getBigDecimalFromString(entry);
+								if (numberValue != null && row.isDivideBy100()) {
+									numberValue = numberValue.divide(
+										BigDecimal.valueOf(100)
+									);
+								}
+							}
+							valueBuilder = ValueManager.getValueFromBigDecimal(numberValue);
+						} else {
+							valueBuilder = ValueManager.getValueFromString(entry);
 						}
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-					valueBuilder = ValueManager.getValueFromBigDecimal(numberValue);
-				} else {
-					valueBuilder = ValueManager.getValueFromString(entry);
 				}
-
 				lineValues.putFields(
 					row.getColumnName(),
 					valueBuilder.build()
 				);
 			}
 
-			entitBuilder.setValues(lineValues);
 			// columns.fo
-			builderList.addRecords(entitBuilder);
+			builderList.addRecords(lineValues);
 		});
 
 		return builderList;
@@ -664,6 +683,11 @@ public class ImportFileLoaderServiceLogic {
 
 			builderItem.setTableName(I_AD_Process.Table_Name);
 			builderItem.setId(processDefinition.getAD_Process_ID());
+			builderItem.setUuid(
+				StringManager.getValidString(
+					processDefinition.getUUID()
+				)
+			);
 
 			builderList.addRecords(builderItem.build());
 		});

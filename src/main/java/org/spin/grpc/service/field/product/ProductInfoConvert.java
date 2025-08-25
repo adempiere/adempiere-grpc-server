@@ -27,6 +27,7 @@ import org.adempiere.core.domains.models.I_M_Storage;
 import org.adempiere.core.domains.models.I_M_Substitute;
 import org.adempiere.core.domains.models.I_M_Warehouse;
 import org.compiere.model.MBPartner;
+import org.compiere.model.MCurrency;
 import org.compiere.model.MProduct;
 import org.compiere.model.MProductPO;
 import org.compiere.model.MUOM;
@@ -39,8 +40,8 @@ import org.spin.backend.grpc.field.product.VendorPurchase;
 import org.spin.backend.grpc.field.product.WarehouseStock;
 import org.spin.base.util.RecordUtil;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.TimeManager;
-import org.spin.service.grpc.util.value.ValueManager;
 
 /**
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
@@ -63,19 +64,19 @@ public class ProductInfoConvert {
 				productId
 			)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_UUID
 					)
 				)
 			)
 			.setDisplayValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					product.getDisplayValue()
 				)
 			)
 			.setValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_Value
 					)
@@ -87,56 +88,56 @@ public class ProductInfoConvert {
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_Name
 					)
 				)
 			)
 			.setUpc(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_UPC
 					)
 				)
 			)
 			.setSku(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_SKU
 					)
 				)
 			)
 			.setUom(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_C_UOM_ID
 					)
 				)
 			)
 			.setProductCategory(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_M_Product_Category_ID
 					)
 				)
 			)
 			.setProductClass(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_M_Product_Class_ID
 					)
 				)
 			)
 			.setProductClassification(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_M_Product_Classification_ID
 					)
 				)
 			)
 			.setProductGroup(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_M_Product_Group_ID
 					)
@@ -148,7 +149,7 @@ public class ProductInfoConvert {
 				)
 			)
 			.setVendor(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						"Vendor"
 					)
@@ -209,6 +210,7 @@ public class ProductInfoConvert {
 				;
 			}
 		}
+
 		if (priceListVersionId > 0) {
 			builder.setListPrice(
 					NumberManager.getBigDecimalToString(
@@ -255,7 +257,7 @@ public class ProductInfoConvert {
 
 		builder.setId(id)
 			.setUuid(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					RecordUtil.getUuidFromId(
 						I_M_Warehouse.Table_Name,
 						id
@@ -263,7 +265,7 @@ public class ProductInfoConvert {
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("WarehouseName")
 				)
 			)
@@ -313,28 +315,28 @@ public class ProductInfoConvert {
 				)
 			)
 			.setValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_Value
 					)
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Substitute.COLUMNNAME_Name
 					)
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Substitute.COLUMNNAME_Description
 					)
 				)
 			)
 			.setWarehouse(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("Warehouse")
 				)
 			)
@@ -384,28 +386,28 @@ public class ProductInfoConvert {
 				)
 			)
 			.setValue(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Product.COLUMNNAME_Value
 					)
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Substitute.COLUMNNAME_Name
 					)
 				)
 			)
 			.setDescription(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_M_Substitute.COLUMNNAME_Description
 					)
 				)
 			)
 			.setWarehouse(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("Warehouse")
 				)
 			)
@@ -481,19 +483,19 @@ public class ProductInfoConvert {
 				)
 			)
 			.setName(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("Warehouse")
 				)
 			)
 			.setDocumentNo(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString(
 						I_C_Order.COLUMNNAME_DocumentNo
 					)
 				)
 			)
 			.setLocator(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("Locator")
 				)
 			)
@@ -528,7 +530,7 @@ public class ProductInfoConvert {
 				)
 			)
 			.setBusinessPartner(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					rs.getString("BP_Name")
 				)
 			)
@@ -555,12 +557,12 @@ public class ProductInfoConvert {
 					businesPartner.getC_BPartner_ID()
 				)
 				.setUuid(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						businesPartner.getUUID()
 					)
 				)
 				.setName(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						businesPartner.getName()
 					)
 				)
@@ -570,14 +572,25 @@ public class ProductInfoConvert {
 		MUOM unitOfMeasure = MUOM.get(Env.getCtx(), productVendor.getC_UOM_ID());
 		if (unitOfMeasure != null && unitOfMeasure.getC_UOM_ID() > 0) {
 			builder.setUnitOfMeasure(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					unitOfMeasure.getName()
 				)
 			);
 		}
 
+		String currencyCode = "";
+		if (productVendor.getC_Currency_ID() > 0) {
+			MCurrency currency = MCurrency.get(Env.getCtx(), productVendor.getC_Currency_ID());
+			if (currency != null && currency.getC_Currency_ID() > 0) {
+				currencyCode = currency.getISO_Code();
+			}
+		}
+
 		builder.setIsCurrentVendor(
 				productVendor.isCurrentVendor()
+			)
+			.setCurrency(
+				StringManager.getValidString(currencyCode)
 			)
 			.setListPrice(
 				NumberManager.getBigDecimalToString(
@@ -595,7 +608,7 @@ public class ProductInfoConvert {
 				)
 			)
 			.setVendorProductKey(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					productVendor.getVendorProductNo()
 				)
 			)

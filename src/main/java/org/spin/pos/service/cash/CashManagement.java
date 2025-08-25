@@ -68,11 +68,7 @@ public class CashManagement {
 		if(cashAccount.getC_BPartner_ID() <= 0) {
 			throw new AdempiereException("@C_BankAccount_ID@ @C_BPartner_ID@ @NotFound@");
 		}
-		//	Validate or complete
-		if(request.getAmount() == null) {
-			throw new AdempiereException("@PayAmt@ @NotFound@");
-		}
-		//	Order
+        //	Order
 		if(request.getCurrencyId() <= 0) {
 			throw new AdempiereException("@C_Currency_ID@ @NotFound@");
 		}
@@ -89,15 +85,14 @@ public class CashManagement {
 		} else {
 			payment.setC_DocType_ID(!request.getIsRefund());
 		}
+		payment.setIsReceipt(!request.getIsRefund());
 		payment.setAD_Org_ID(pointOfSalesDefinition.getAD_Org_ID());
         String value = DB.getDocumentNo(payment.getC_DocType_ID(), transactionName, false,  payment);
         payment.setDocumentNo(value);
-		Timestamp date = ValueManager.getDateFromTimestampDate(
-			request.getPaymentAccountDate()
-		);
-    	if(date != null) {
-    		payment.setDateAcct(date);
-    	}
+        Timestamp date = ValueManager.getDateFromTimestampDate(request.getPaymentAccountDate());
+        if(date != null) {
+        	payment.setDateAcct(date);
+        }
         payment.setTenderType(tenderType);
         if(!Util.isEmpty(request.getDescription())) {
         	payment.setDescription(request.getDescription());
@@ -113,9 +108,7 @@ public class CashManagement {
         }
         payment.setC_Charge_ID(defaultChargeId);
         //	Amount
-		BigDecimal paymentAmount = NumberManager.getBigDecimalFromString(
-			request.getAmount()
-		);
+        BigDecimal paymentAmount = NumberManager.getBigDecimalFromString(request.getAmount());
         payment.setPayAmt(paymentAmount);
         payment.setDocStatus(MPayment.DOCSTATUS_Drafted);
 		switch (tenderType) {
@@ -125,6 +118,27 @@ public class CashManagement {
 			case MPayment.TENDERTYPE_DirectDebit:
 				break;
 			case MPayment.TENDERTYPE_CreditCard:
+				if (!Util.isEmpty(request.getCreditCardTypeValue(), true)) {
+					payment.setCreditCardType(
+						request.getCreditCardTypeValue()
+					);
+				}
+				if (!Util.isEmpty(request.getCreditCardNumber(), true)) {
+					payment.setCreditCardNumber(
+						request.getCreditCardNumber()
+					);
+				}
+				if (!Util.isEmpty(request.getCreditCardVerificationValue(), true)) {
+					payment.setCreditCardVV(
+						request.getCreditCardVerificationValue()
+					);
+				}
+				payment.setCreditCardExpMM(
+					request.getCreditCardExpirityMonth()
+				);
+				payment.setCreditCardExpYY(
+					request.getCreditCardExpirityYear()
+				);
 				break;
 			case MPayment.TENDERTYPE_MobilePaymentInterbank:
 				payment.setR_PnRef(request.getReferenceNo());
@@ -206,7 +220,7 @@ public class CashManagement {
 	 * @return
 	 */
 	private static MPayment createRelatedPayment(MPOS pointOfSalesDefinition, MPayment sourcePayment, String transactionName) {
-		if(sourcePayment.get_ValueAsInt("POSReferenceBankAccount_ID") <= 0) {
+		if(sourcePayment.get_ValueAsInt("POSReferenceBankAccount_ID") <= 0 || sourcePayment.getPayAmt().compareTo(Env.ZERO) == 0) {
 			return null;
 		}
 		MPayment relatedPayment = new MPayment(Env.getCtx(), 0, transactionName);
@@ -238,6 +252,9 @@ public class CashManagement {
 	 * @param payment
 	 */
 	public static void addPaymentToCash(MPOS pos, MPayment payment) {
+		if(payment.getC_BankAccount_ID() != pos.getC_BankAccount_ID()) {
+			return;
+		}
 		//	validate document type
 		int cashClosingDocumentTypeId = pos.get_ValueAsInt("POSCashClosingDocumentType_ID");
 		//	Create Cash closing
@@ -284,20 +301,28 @@ public class CashManagement {
 			return;
 		}
 		//	Find
-		StringBuilder whereClause = new StringBuilder();
-		whereClause.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND StatementDate < ?")
-				.append(" AND ").append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
-				.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
-				.append(" AND ").append("C_POS_ID = ?");
-		MBankStatement bankStatement = new Query(Env.getCtx(), MBankStatement.Table_Name, whereClause.toString(), transactionName)
-				.setClient_ID()
-				.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
-				.first();
+		StringBuilder whereClause = new StringBuilder()
+			.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND StatementDate < ?")
+			.append(" AND ").append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
+			.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
+			.append(" AND ").append("C_POS_ID = ?")
+		;
+		MBankStatement bankStatement = new Query(
+			Env.getCtx(),
+			MBankStatement.Table_Name,
+			whereClause.toString(),
+			transactionName
+		)
+			.setClient_ID()
+			.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
+			.setOrderBy("StatementDate DESC")
+			.first()
+		;
 		if (bankStatement != null && bankStatement.get_ID() > 0) {
 			throw new AdempiereException("@POS.PreviousCashClosingOpened@: " + bankStatement.getDocumentNo());
 		}
 	}
-	
+
 	/**
 	 * Get Current bank statement
 	 * @param pos
@@ -317,15 +342,23 @@ public class CashManagement {
 		if(pos.getC_BankAccount_ID() <= 0) {
 			throw new AdempiereException("@C_BankAccount_ID@ @NotFound@");
 		}
-		StringBuilder whereClause = new StringBuilder();
-		whereClause.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND StatementDate <= ?")
-		.append(" AND ").append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
-		.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
-		.append(" AND ").append("C_POS_ID = ?");
-		MBankStatement bankStatement = new Query(Env.getCtx() , MBankStatement.Table_Name , whereClause.toString(), transactionName)
-				.setClient_ID()
-				.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
-				.first();
+		StringBuilder whereClause = new StringBuilder()
+			.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND StatementDate <= ?")
+			.append(" AND ").append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
+			.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
+			.append(" AND ").append("C_POS_ID = ?")
+		;
+		MBankStatement bankStatement = new Query(
+			Env.getCtx(),
+			MBankStatement.Table_Name ,
+			whereClause.toString(),
+			transactionName
+		)
+			.setClient_ID()
+			.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
+			.setOrderBy("StatementDate DESC")
+			.first()
+		;
 		if (bankStatement == null || bankStatement.get_ID() <= 0) {
 			if(pos.get_ValueAsBoolean("IsValidatePOSCashOpening") && validate) {
 				throw new AdempiereException("@POS.CashClosingNotFound@");
@@ -333,7 +366,7 @@ public class CashManagement {
 		}
 		return bankStatement;
 	}
-	
+
 	/**
 	 * Get Current bank statement
 	 * @param pos
@@ -353,16 +386,24 @@ public class CashManagement {
 		if(pos.getC_BankAccount_ID() <= 0) {
 			throw new AdempiereException("@C_BankAccount_ID@ @NotFound@");
 		}
-		StringBuilder whereClause = new StringBuilder();
-		whereClause.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND ")
-				.append("TRUNC(").append(MBankStatement.COLUMNNAME_StatementDate).append(",'DD') = ? AND ")
-				.append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
-				.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
-				.append(" AND ").append("C_POS_ID = ?");
-		MBankStatement bankStatement = new Query(Env.getCtx() , MBankStatement.Table_Name , whereClause.toString(), transactionName)
-				.setClient_ID()
-				.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
-				.first();
+		StringBuilder whereClause = new StringBuilder()
+			.append(MBankStatement.COLUMNNAME_C_BankAccount_ID).append(" = ? AND ")
+			.append("TRUNC(").append(MBankStatement.COLUMNNAME_StatementDate).append(",'DD') = ? AND ")
+			.append(MBankStatement.COLUMNNAME_Processed).append(" = ?")
+			.append(" AND ").append(MBankStatement.COLUMNNAME_C_DocType_ID).append(" = ?")
+			.append(" AND ").append("C_POS_ID = ?")
+		;
+		MBankStatement bankStatement = new Query(
+			Env.getCtx(),
+			MBankStatement.Table_Name,
+			whereClause.toString(),
+			transactionName
+		)
+			.setClient_ID()
+			.setParameters(pos.getC_BankAccount_ID(), TimeUtil.getDay(validDate), false, cashClosingDocumentTypeId, pos.getC_POS_ID())
+			.setOrderBy("StatementDate DESC")
+			.first()
+		;
 		if (bankStatement == null || bankStatement.get_ID() <= 0) {
 			if(pos.get_ValueAsBoolean("IsValidatePOSCashOpening") && validate) {
 				throw new AdempiereException("@POS.CashClosingNotFound@");
@@ -387,7 +428,7 @@ public class CashManagement {
 		MBankStatement bankStatement = getCurrentCashClosing(pos, payment.getDateTrx(), false, payment.get_TrxName());
 		if (bankStatement == null || bankStatement.get_ID() <= 0) {
 			bankStatement = new MBankStatement(payment.getCtx() , 0 , payment.get_TrxName());
-			bankStatement.setC_BankAccount_ID(payment.getC_BankAccount_ID());
+			bankStatement.setC_BankAccount_ID(pos.getC_BankAccount_ID());
 			bankStatement.setStatementDate(payment.getDateAcct());
 			bankStatement.setC_DocType_ID(cashClosingDocumentTypeId);
 			bankStatement.setAD_Org_ID(pos.getAD_Org_ID());

@@ -69,6 +69,7 @@ import org.spin.grpc.service.field.field_management.FieldManagementLogic;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
 import org.spin.service.grpc.util.value.NumberManager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -495,7 +496,7 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 		ListProductsResponse.Builder builderList = ListProductsResponse.newBuilder()
 			.setRecordCount(count)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -523,21 +524,30 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 		if (product == null) {
 			return builder;
 		}
-		builder.setId(product.getM_Product_ID())
+		builder.setId(
+				product.getM_Product_ID()
+			)
 			.setUpc(
-				ValueManager.validateNull(product.getUPC())
+				StringManager.getValidString(
+					product.getUPC()
+				)
 			)
 			.setSku(
-				ValueManager.validateNull(product.getSKU())
+				StringManager.getValidString(
+					product.getSKU()
+				)
 			)
 			.setValue(
-				ValueManager.validateNull(product.getValue())
+				StringManager.getValidString(
+					product.getValue()
+				)
 			)
 			.setName(
-				ValueManager.validateNull(product.getName())
+				StringManager.getValidString(
+					product.getName()
+				)
 			)
 		;
-
 		return builder;
 	}
 
@@ -855,7 +865,7 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 
 		return ProcessResponse.newBuilder()
 			.setMessage(
-				ValueManager.validateNull(
+				StringManager.getValidString(
 					atomicStatus.get()
 				)
 			)

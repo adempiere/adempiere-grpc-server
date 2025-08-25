@@ -39,6 +39,7 @@ import org.compiere.process.DocAction;
 import org.compiere.util.Env;
 import org.compiere.util.Msg;
 import org.compiere.util.Trx;
+import org.spin.pos.service.payment.PaymentManagement;
 import org.spin.pos.util.ColumnsAdded;
 
 /**
@@ -203,45 +204,69 @@ public class RMAUtil {
 			returnOrderLine.setRef_InOutLine_ID(shipmentLineId);
 		}
 		return returnOrderLine;
-    }
-    
-    /**
-     * Reverse all payments
-     * @param pos
-     * @param sourceOrder
-     * @param returnOrder
-     * @param transactionName
-     */
-    public static void createReversedPayments(MPOS pos, MOrder sourceOrder, MOrder returnOrder, String transactionName) {
-    	MPayment.getOfOrder(sourceOrder).forEach(sourcePayment -> {
-        	MPayment returnPayment = new MPayment(sourceOrder.getCtx(), 0, transactionName);
-            PO.copyValues(sourcePayment, returnPayment);
-            returnPayment.setC_Invoice_ID(-1);
-            returnPayment.setDateTrx(OrderUtil.getToday());
-            returnPayment.setDateAcct(OrderUtil.getToday());
-            returnPayment.addDescription(Msg.parseTranslation(sourceOrder.getCtx(), " @From@ " + sourcePayment.getDocumentNo() + " @of@ @C_Order_ID@ " + sourceOrder.getDocumentNo()));
-            returnPayment.setIsReceipt(sourcePayment.isReceipt());
-            returnPayment.setPayAmt(sourcePayment.getPayAmt().negate());
-            returnPayment.setDocAction(DocAction.ACTION_Complete);
-            returnPayment.setDocStatus(DocAction.STATUS_Drafted);
-            returnPayment.setC_Order_ID(returnOrder.getC_Order_ID());
-            returnPayment.setIsPrepayment(sourcePayment.isPrepayment());
-            returnPayment.saveEx();
-        });
-    }
-    
-    /**
-     * Generate Credit Memo from Return Order
-     * @param returnOrder
-     * @param transactionName
-     */
-    public static void generateCreditMemoFromRMA(MOrder returnOrder, String transactionName) {
-    	if(!OrderUtil.isInvoiced(returnOrder.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_Order_ID), transactionName)) {
-    		return;
-    	}
-    	MInvoice invoice = new MInvoice (returnOrder, 0, OrderUtil.getToday());
+	}
+
+	/**
+	 * Reverse all payments
+	 * @param pos
+	 * @param sourceOrder
+	 * @param returnOrder
+	 * @param transactionName
+	 */
+	public static void createReversedPayments(MPOS pos, MOrder sourceOrder, MOrder returnOrder, String transactionName) {
+		MPayment.getOfOrder(sourceOrder).forEach(sourcePayment -> {
+			MPayment returnPayment = new MPayment(sourceOrder.getCtx(), 0, transactionName);
+			PO.copyValues(sourcePayment, returnPayment);
+			returnPayment.setC_Invoice_ID(-1);
+			returnPayment.setDateTrx(OrderUtil.getToday());
+			returnPayment.setDateAcct(OrderUtil.getToday());
+			returnPayment.addDescription(Msg.parseTranslation(sourceOrder.getCtx(), " @From@ " + sourcePayment.getDocumentNo() + " @of@ @C_Order_ID@ " + sourceOrder.getDocumentNo()));
+			returnPayment.setIsReceipt(!sourcePayment.isReceipt());
+			returnPayment.setPayAmt(sourcePayment.getPayAmt());
+			returnPayment.setDocAction(DocAction.ACTION_Complete);
+			returnPayment.setDocStatus(DocAction.STATUS_Drafted);
+			returnPayment.setC_Order_ID(returnOrder.getC_Order_ID());
+			returnPayment.setIsPrepayment(sourcePayment.isPrepayment());
+			if (sourcePayment.isOnline()) {
+				returnPayment.setIsOnline(true);
+				returnPayment.setR_PnRef_DC(sourcePayment.getR_PnRef_DC());
+				returnPayment.setR_PnRef(null);
+				returnPayment.set_ValueOfColumn("ResponseStatus", null);
+				returnPayment.set_ValueOfColumn("NextRequestTime", 0);
+				returnPayment.set_ValueOfColumn("ResponseMessage", null);
+				returnPayment.set_ValueOfColumn("ResponseCode", null);
+				returnPayment.setIsApproved(false);
+				returnPayment.setR_AuthCode(null);
+				returnPayment.setR_Info(null);
+				returnPayment.setR_RespMsg(null);
+				returnPayment.setR_Result(null);
+			}
+
+			//	Document Type
+			PaymentManagement.setDocumentType(
+				pos,
+				returnPayment,
+				null,
+				null
+			);
+
+			returnPayment.saveEx();
+		});
+	}
+
+	/**
+	 * Generate Credit Memo from Return Order
+	 * @param returnOrder
+	 * @param transactionName
+	 */
+	public static MInvoice generateCreditMemoFromRMA(MOrder returnOrder, String transactionName) {
+		if(!OrderUtil.isInvoiced(returnOrder.get_ValueAsInt(ColumnsAdded.COLUMNNAME_ECA14_Source_Order_ID), transactionName)) {
+			return null;
+		}
+		MInvoice invoice = new MInvoice (returnOrder, 0, OrderUtil.getToday());
+		invoice.setC_POS_ID(returnOrder.getC_POS_ID());
 		invoice.saveEx();
-    	//	Convert Lines
+		//	Convert Lines
 		new Query(returnOrder.getCtx(), I_C_OrderLine.Table_Name, "C_Order_ID = ?", transactionName)
 			.setParameters(returnOrder.getC_Order_ID())
 			.setClient_ID()
@@ -256,14 +281,15 @@ public class RMAUtil {
 				line.saveEx();
 		});
 		if(!invoice.processIt(MOrder.DOCACTION_Complete)) {
-        	throw new AdempiereException(invoice.getProcessMsg());
-        }
+			throw new AdempiereException(invoice.getProcessMsg());
+		}
 		invoice.saveEx();
 		returnOrder.setIsInvoiced(true);
 		returnOrder.set_ValueOfColumn("AssignedSalesRep_ID", null);
 		returnOrder.saveEx();
-    }
-    
+		return invoice;
+	}
+
     /**
      * Generate Return from Return Order
      * @param returnOrder
@@ -274,6 +300,7 @@ public class RMAUtil {
     		return;
     	}
     	MInOut shipment = new MInOut (returnOrder, 0, OrderUtil.getToday());
+    	shipment.setC_POS_ID(returnOrder.getC_POS_ID());
 		shipment.setM_Warehouse_ID(returnOrder.getM_Warehouse_ID());	//	sets Org too
 		shipment.saveEx();
 		//	Convert Lines

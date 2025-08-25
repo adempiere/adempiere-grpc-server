@@ -17,7 +17,9 @@ package org.spin.grpc.service;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -30,12 +32,15 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.adempiere.core.domains.models.I_AD_PInstance;
 import org.adempiere.core.domains.models.I_AD_PrintFormat;
 import org.adempiere.core.domains.models.I_AD_Process_Para;
 import org.adempiere.core.domains.models.I_AD_ReportView;
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.pdf.IText7Document;
 import org.compiere.model.MMenu;
 import org.compiere.model.MPInstance;
 import org.compiere.model.MProcess;
@@ -70,15 +75,19 @@ import org.spin.backend.grpc.report_management.ListPrintFormatsRequest;
 import org.spin.backend.grpc.report_management.ListPrintFormatsResponse;
 import org.spin.backend.grpc.report_management.ListReportViewsRequest;
 import org.spin.backend.grpc.report_management.ListReportViewsResponse;
+import org.spin.backend.grpc.report_management.PrintEntitiesBatchRequest;
+import org.spin.backend.grpc.report_management.PrintEntitiesBatchResponse;
 import org.spin.backend.grpc.report_management.PrintFormat;
-import org.spin.backend.grpc.report_management.ReportView;
 import org.spin.backend.grpc.report_management.ReportManagementGrpc.ReportManagementImplBase;
+import org.spin.backend.grpc.report_management.ReportView;
 import org.spin.base.util.AccessUtil;
 import org.spin.base.util.ConvertUtil;
 import org.spin.base.util.FileUtil;
 import org.spin.base.util.RecordUtil;
 import org.spin.dictionary.util.DictionaryUtil;
 import org.spin.dictionary.util.ReportUtil;
+import org.spin.eca62.util.S3Manager;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.ByteString;
@@ -90,10 +99,10 @@ import io.grpc.stub.StreamObserver;
 public class ReportManagement extends ReportManagementImplBase {
 
 	/**	Logger			*/
-	private CLogger log = CLogger.getCLogger(ReportManagement.class);
+	private static CLogger log = CLogger.getCLogger(ReportManagement.class);
 
 
-	
+
 	@Override
 	public void generateReport(GenerateReportRequest request, StreamObserver<ProcessLog> responseObserver) {
 		try {
@@ -105,12 +114,13 @@ public class ReportManagement extends ReportManagementImplBase {
 			responseObserver.onNext(processReponse.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
-			responseObserver.onError(Status.INTERNAL
-				.withDescription(e.getLocalizedMessage())
-				.withCause(e)
-				.asRuntimeException()
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
 			);
 		}
 	}
@@ -159,10 +169,33 @@ public class ReportManagement extends ReportManagementImplBase {
 			throw new AdempiereException("@AccessCannotReport@");
 		}
 
-		ProcessLog.Builder response = ProcessLog.newBuilder()
+		//	Add to recent Item
+		DictionaryUtil.addToRecentItem(
+			MMenu.ACTION_Report,
+			process.getAD_Process_ID()
+		);
+
+		// TODO: Add process parameters by instance
+		ProcessLog.Builder responseBuilder = ProcessLog.newBuilder()
 			.setId(
 				process.getAD_Process_ID()
-			);
+			)
+			.setUuid(
+				StringManager.getValidString(
+					process.getUUID()
+				)
+			)
+			.setName(
+				StringManager.getValidString(
+					process.getName()
+				)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					process.getDescription()
+				)
+			)
+		;
 
 		int tableId = 0;
 		MTable table = null;
@@ -262,16 +295,21 @@ public class ReportManagement extends ReportManagementImplBase {
 			result = builder.execute();
 		} catch (Exception e) {
 			e.printStackTrace();
-			// log.severe(e.getLocalizedMessage());
+			// log.warning(e.getLocalizedMessage());
 
 			result = builder.getProcessInfo();
 			//	Set error message
-			String summary = Msg.parseTranslation(Env.getCtx(), result.getSummary());
+			String summary = result.getSummary();
 			if(Util.isEmpty(summary, true)) {
 				summary = e.getLocalizedMessage();
 			}
 			result.setSummary(
-				ValueManager.validateNull(summary)
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						summary
+					)
+				)
 			);
 		}
 
@@ -287,11 +325,28 @@ public class ReportManagement extends ReportManagementImplBase {
 				I_AD_PInstance.COLUMNNAME_AD_PInstance_ID + " = ?",
 				null
 			)
-				.setParameters(result.getAD_PInstance_ID())
-				.first();
-			response.setInstanceId(instance.getAD_PInstance_ID());
+				.setParameters(
+					result.getAD_PInstance_ID()
+				)
+				.first()
+			;
+			responseBuilder.setInstanceId(
+				instance.getAD_PInstance_ID()
+			);
 
-			response.setLastRun(
+			// if (!Util.isEmpty(instance.getErrorMsg(), true)) {
+			// 	result.setError(true);
+			// 	String errorMessage = Msg.parseTranslation(
+			// 		Env.getCtx(),
+			// 		instance.getErrorMsg()
+			// 	);
+			// 	if (!Util.isEmpty(result.getSummary(), true)) {
+			// 		errorMessage = result.getSummary() + " " + errorMessage;
+			// 	}
+			// 	result.setSummary(errorMessage);
+			// }
+
+			responseBuilder.setLastRun(
 				ValueManager.getTimestampFromDate(
 					instance.getUpdated()
 				)
@@ -331,13 +386,22 @@ public class ReportManagement extends ReportManagementImplBase {
 		}
 
 		//	
-		response.setIsError(result.isError());
-		if(!Util.isEmpty(result.getSummary())) {
-			response.setSummary(Msg.parseTranslation(Env.getCtx(), result.getSummary()));
+		responseBuilder.setIsError(
+			result.isError()
+		);
+		if(!Util.isEmpty(result.getSummary(), true)) {
+			responseBuilder.setSummary(
+				StringManager.getValidString(
+					Msg.parseTranslation(
+						Env.getCtx(),
+						result.getSummary()
+					)
+				)
+			);
 		}
 		//	
-		response.setResultTableName(
-			ValueManager.validateNull(
+		responseBuilder.setResultTableName(
+			StringManager.getValidString(
 				result.getResultTableName()
 			)
 		);
@@ -345,12 +409,14 @@ public class ReportManagement extends ReportManagementImplBase {
 		if(result.getLogList() != null) {
 			for(org.compiere.process.ProcessInfoLog log : result.getLogList()) {
 				ProcessInfoLog.Builder infoLogBuilder = ConvertUtil.convertProcessInfoLog(log);
-				response.addLogs(infoLogBuilder.build());
+				responseBuilder.addLogs(
+					infoLogBuilder.build()
+				);
 			}
 		}
 		//	Verify Output
-		response = addReportOutput(
-			response,
+		responseBuilder = addReportOutput(
+			responseBuilder,
 			result,
 			process,
 			reportType,
@@ -359,10 +425,14 @@ public class ReportManagement extends ReportManagementImplBase {
 			tableNameReference
 		);
 
-		return response;
+		return responseBuilder;
 	}
 
 
+	/**
+	 * TODO: Return only report output
+	 * TODO: Add ReportEngine support to HeaderName, FooterName
+	 */
 	public static ProcessLog.Builder addReportOutput(
 		ProcessLog.Builder processBuilder,
 		ProcessInfo processInfo,
@@ -373,83 +443,108 @@ public class ReportManagement extends ReportManagementImplBase {
 		String tableName
 	) {
 		//	Verify Output
-		File reportFile = Optional.ofNullable(processInfo.getReportAsFile()).orElse(processInfo.getPDFReport());
-		if(reportFile != null && reportFile.exists()) {
-			String validFileName = FileUtil.getValidFileName(reportFile.getName());
-			ReportOutput.Builder output = ReportOutput.newBuilder()
-				.setId(
-					processInfo.getAD_PInstance_ID()
+		File reportFile = Optional.ofNullable(
+			processInfo.getReportAsFile()
+		).orElse(
+			processInfo.getPDFReport()
+		);
+		if (reportFile == null || !reportFile.exists()) {
+			return processBuilder;
+		}
+		String validFileName = FileUtil.getValidFileName(
+			reportFile.getName()
+		);
+		MPInstance instance = new MPInstance(Env.getCtx(), processInfo.getAD_PInstance_ID(), null);
+		ReportOutput.Builder outputBuilder = ReportOutput.newBuilder()
+			.setId(
+				processInfo.getAD_PInstance_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					instance.getUUID()
 				)
-				.setFileName(
-					ValueManager.validateNull(
+			)
+			.setFileName(
+				StringManager.getValidString(
+					validFileName
+				)
+			)
+			.setName(
+				StringManager.getValidString(
+					processInfo.getTitle()
+				)
+			)
+			.setMimeType(
+				StringManager.getValidString(
+					MimeType.getMimeType(
 						validFileName
 					)
 				)
-				.setName(
-					ValueManager.validateNull(
-						processInfo.getTitle()
-					)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					process.getDescription()
 				)
-				.setMimeType(
-					ValueManager.validateNull(
-						MimeType.getMimeType(
-							validFileName
-						)
-					)
-				)
-				.setDescription(
-					ValueManager.validateNull(
-						process.getDescription()
-					)
-				)
-			;
+			)
+		;
 
-			//	Report Type
-			if(Util.isEmpty(reportType, true)) {
-				reportType = processInfo.getReportType();
-			}
-			if(!Util.isEmpty(FileUtil.getExtension(validFileName))
-					&& !FileUtil.getExtension(validFileName).equals(reportType)) {
-				reportType = FileUtil.getExtension(validFileName);
-			}
-			if (Util.isEmpty(reportType, true)) {
-				reportType = ReportUtil.DEFAULT_REPORT_TYPE;
-			}
-			output.setReportType(
-				processInfo.getReportType()
-			);
+		//	Report Type
+		if(Util.isEmpty(reportType, true)) {
+			reportType = processInfo.getReportType();
+		}
+		if(!Util.isEmpty(FileUtil.getExtension(validFileName), true)
+				&& !FileUtil.getExtension(validFileName).equals(reportType)) {
+			reportType = FileUtil.getExtension(validFileName);
+		}
+		if (Util.isEmpty(reportType, true)) {
+			reportType = ReportUtil.DEFAULT_REPORT_TYPE;
+		}
+		outputBuilder.setReportType(
+			processInfo.getReportType()
+		);
 
-			ByteString resultFile = ByteString.empty();
-			try {
-				resultFile = ByteString.readFrom(new FileInputStream(reportFile));
-			} catch (IOException e) {
-				e.printStackTrace();
-				// log.severe(e.getLocalizedMessage());
+		ByteString resultFile = ByteString.empty();
+		try {
+			FileInputStream inputStream = new FileInputStream(reportFile);
+			resultFile = ByteString.readFrom(inputStream);
+		} catch (IOException e) {
+			e.printStackTrace();
+			log.warning(e.getLocalizedMessage());
 
-				if (Util.isEmpty(processBuilder.getSummary(), true)) {
-					processBuilder.setSummary(
-						ValueManager.validateNull(
+			if (Util.isEmpty(processBuilder.getSummary(), true)) {
+				processBuilder.setSummary(
+					StringManager.getValidString(
+						Msg.parseTranslation(
+							Env.getCtx(),
 							e.getLocalizedMessage()
 						)
-					);
-				}
+					)
+				);
 			}
-			if(reportType.endsWith("html") || reportType.endsWith("txt")) {
-				output.setOutputBytes(resultFile);
-			}
-			output.setReportType(reportType)
-				.setOutputStream(resultFile)
-				.setReportViewId(reportViewReferenceId)
-				.setPrintFormatId(printFormatReferenceId)
-				.setTableName(
-					ValueManager.validateNull(tableName)
-				)
-			;
-			processBuilder.setOutput(output.build());
+			processBuilder.setIsError(true);
 		}
+		if (resultFile != null) {
+			outputBuilder.setOutputStream(resultFile);
+			if(reportType.endsWith("html") || reportType.endsWith("txt")) {
+				outputBuilder.setOutputBytes(resultFile);
+			}
+		}
+
+		outputBuilder.setReportType(reportType)
+			.setReportViewId(reportViewReferenceId)
+			.setPrintFormatId(printFormatReferenceId)
+			.setTableName(
+				StringManager.getValidString(tableName)
+			)
+			.setIsDirectPrint(
+				process.isDirectPrint()
+			)
+		;
+		processBuilder.setOutput(outputBuilder);
 
 		return processBuilder;
 	}
+
 
 
 	@Override
@@ -462,13 +557,14 @@ public class ReportManagement extends ReportManagementImplBase {
 			responseObserver.onNext(reportOutput.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
-			responseObserver.onError(Status.INTERNAL
-				.withDescription(e.getLocalizedMessage())
-				.withCause(e)
-				.asRuntimeException())
-			;
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
 		}
 	}
 
@@ -586,36 +682,59 @@ public class ReportManagement extends ReportManagementImplBase {
 			reportType = ReportUtil.DEFAULT_REPORT_TYPE;
 		}
 
-		ReportOutput.Builder builder = ReportOutput.newBuilder()
+		MPInstance instance = new MPInstance(Env.getCtx(), printInformation.getAD_PInstance_ID(), null);
+		ReportOutput.Builder outputBuilder = ReportOutput.newBuilder()
 			.setId(
-				printInformation.getAD_PInstance_ID()
+				instance.getAD_PInstance_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					instance.getUUID()
+				)
 			)
 			.setReportType(reportType)
+			.setIsDirectPrint(
+				process.isDirectPrint()
+			)
 		;
 		//	
 		File reportFile = ReportUtil.createOutput(reportEngine, reportType);
-		if (reportFile != null && reportFile.exists()) {
-			String validFileName = FileUtil.getValidFileName(
-				reportFile.getName()
-			);
-			builder.setFileName(
-					ValueManager.validateNull(validFileName)
+		if (reportFile == null || !reportFile.exists()) {
+			return outputBuilder;
+		}
+		String validFileName = FileUtil.getValidFileName(
+			reportFile.getName()
+		);
+		outputBuilder.setFileName(
+				StringManager.getValidString(
+					validFileName
 				)
-				.setName(
-					ValueManager.validateNull(
-						reportEngine.getName()
+			)
+			.setName(
+				StringManager.getValidString(
+					reportEngine.getName()
+				)
+			)
+			.setMimeType(
+				StringManager.getValidString(
+					MimeType.getMimeType(
+						validFileName
 					)
 				)
-				.setMimeType(
-					ValueManager.validateNull(
-						MimeType.getMimeType(validFileName)
-					)
+			)
+			.setDescription(
+				StringManager.getValidString(
+					process.getDescription()
 				)
-			;
+			)
+		;
 			// Header
-			String headerName = Msg.getMsg(Env.getCtx(), "Report") + ": " + reportEngine.getName() + "  " + Env.getHeader(Env.getCtx(), 0);
-			builder.setHeaderName(
-				ValueManager.validateNull(headerName)
+			String headerName = Msg.getMsg(
+				Env.getCtx(),
+				"Report"
+			) + ": " + reportEngine.getName() + " " + Env.getHeader(Env.getCtx(), 0);
+			outputBuilder.setHeaderName(
+				StringManager.getValidString(headerName)
 			);
 			// Footer
 			StringBuffer footerName = new StringBuffer ();
@@ -624,33 +743,44 @@ public class ReportManagement extends ReportManagementImplBase {
 				.append(", ").append(Msg.getMsg(Env.getCtx(), "DataRows")).append("=")
 				.append(reportEngine.getRowCount())
 			;
-			builder.setFooterName(
-				ValueManager.validateNull(
+			outputBuilder.setFooterName(
+				StringManager.getValidString(
 					footerName.toString()
 				)
 			);
-			ByteString resultFile = ByteString.readFrom(new FileInputStream(reportFile));
-			if (reportType.endsWith("html") || reportType.endsWith("txt")) {
-				builder.setOutputBytes(resultFile);
+
+			ByteString resultFile = ByteString.empty();
+			try {
+				FileInputStream inputStream = new FileInputStream(reportFile);
+				resultFile = ByteString.readFrom(inputStream);
+			} catch (IOException e) {
+				e.printStackTrace();
+				log.warning(e.getLocalizedMessage());
 			}
+			if (resultFile != null) {
+				outputBuilder.setOutputStream(resultFile);
+				if(reportType.endsWith("html") || reportType.endsWith("txt")) {
+					outputBuilder.setOutputBytes(resultFile);
+				}
+			}
+
 			if(reportView != null) {
-				builder.setReportViewId(
+				outputBuilder.setReportViewId(
 					reportView.getAD_ReportView_ID()
 				);
 			}
-			builder.setPrintFormatId(
+			outputBuilder.setPrintFormatId(
 					printFormat.getAD_PrintFormat_ID()
 				)
 				.setTableName(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						table.getTableName()
 					)
 				)
-				.setOutputStream(resultFile)
 			;
-		}
+
 		//	Return
-		return builder;
+		return outputBuilder;
 	}
 
 
@@ -665,8 +795,81 @@ public class ReportManagement extends ReportManagementImplBase {
 			responseObserver.onNext(printFormatsList.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
+
+	@Override
+	public void printEntitiesBatch(PrintEntitiesBatchRequest request, StreamObserver<PrintEntitiesBatchResponse> responseObserver) {
+		try {
+			PrintEntitiesBatchResponse.Builder printResponse = PrintEntitiesBatchResponse.newBuilder();
+			if(request.getReportId() <= 0) {
+				throw new AdempiereException("@AD_Process_ID@ @IsMandatory@");
+			}
+			if(Util.isEmpty(request.getTableName(), true)) {
+				throw new AdempiereException("@TableName@ @IsMandatory@");
+			}
+			MTable table = MTable.get(Env.getCtx(), request.getTableName());
+			if(table == null) {
+				throw new AdempiereException("@TableName@ @IsMandatory@");
+			}
+			List<File> files = new ArrayList<>();
+			request.getIdsList().forEach(recordId -> {
+				//	Call process builder
+				ProcessInfo result = ProcessBuilder.create(Env.getCtx())
+					.process(request.getReportId())
+					.withRecordId(table.getAD_Table_ID(), recordId)
+					.withoutPrintPreview()
+					.withoutBatchMode()
+					.withWindowNo(0)
+					.withTitle("Print Report")
+					.withoutTransactionClose()
+					.withReportExportFormat(ReportUtil.DEFAULT_REPORT_TYPE)
+					.execute()
+				;
+				File reportFile = result.getPDFReport();
+				if(reportFile != null) {
+					files.add(reportFile);
+				}
+			});
+			//	Validate Type
+			if(files.size() > 0) {
+				String fileType = Optional.ofNullable(request.getFileType()).orElse("pdf");
+				if(fileType.equals("pdf")) {
+					File outFile = File.createTempFile("BatchPrint_", ".pdf");
+					IText7Document.mergePdf(files, outFile);
+					printResponse.setFileName(
+						StringManager.getValidString(
+							S3Manager.putTemporaryFile(outFile)
+						)
+					);
+				} else {
+					File outFile = File.createTempFile("BatchPrint_", ".zip");
+					try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outFile))) {
+					    for (File file : files) {
+					        zipOut.putNextEntry(new ZipEntry(file.getName()));
+					        Files.copy(file.toPath(), zipOut);
+					    }
+					}
+					printResponse.setFileName(
+						StringManager.getValidString(
+							S3Manager.putTemporaryFile(outFile)
+						)
+					);
+				}
+				printResponse.setRecordCount(files.size());
+			}
+			responseObserver.onNext(printResponse.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.warning(e.getLocalizedMessage());
 			responseObserver.onError(
 				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
@@ -697,14 +900,25 @@ public class ReportManagement extends ReportManagementImplBase {
 			if (table == null || table.getAD_Table_ID() <= 0) {
 				throw new AdempiereException("@TableName@ @NotFound@");
 			}
-			whereClause = "AD_Table_ID = ?";
+			whereClause = "AD_Table_ID = ? "
+				+ "OR EXISTS ("
+					+ "SELECT 1 FROM AD_PrintFormat AS pf "
+					+ "INNER JOIN AD_ReportView AS rv ON (rv.AD_ReportView_ID = pf.AD_ReportView_ID) "
+					+ "WHERE rv.AD_Table_ID = ? "
+					+ "AND pf.AD_PrintFormat_ID = AD_PrintFormat.AD_PrintFormat_ID "
+					+ "AND rv.IsActive = 'Y' "
+				+ ")"
+			;
+			parameters.add(table.getAD_Table_ID());
 			parameters.add(table.getAD_Table_ID());
 		} else if(request.getReportId() > 0) {
 			whereClause = "EXISTS("
-				+ "SELECT 1 FROM AD_Process AS p "
-				+ "WHERE p.AD_Process_ID = ? "
-				+ "AND (p.AD_PrintFormat_ID = AD_PrintFormat.AD_PrintFormat_ID "
-				+ "OR p.AD_ReportView_ID = AD_PrintFormat.AD_ReportView_ID))"
+					+ "SELECT 1 FROM AD_Process AS p "
+					+ "WHERE p.AD_Process_ID = ? "
+					+ "AND (p.AD_PrintFormat_ID = AD_PrintFormat.AD_PrintFormat_ID "
+					+ "OR p.AD_ReportView_ID = AD_PrintFormat.AD_ReportView_ID) "
+					+ "AND p.IsActive = 'Y' "
+				+ ")"
 			;
 			parameters.add(request.getReportId());
 		} else if(request.getReportViewId() > 0) {
@@ -717,8 +931,11 @@ public class ReportManagement extends ReportManagementImplBase {
 				.setParameters(request.getReportViewId())
 				.first()
 			;
-			if (reportView != null && reportView.getAD_ReportView_ID() > 0) {
+			if (reportView == null || reportView.getAD_ReportView_ID() <= 0) {
 				throw new AdempiereException("@AD_ReportView_ID@ @NotFound@");
+			}
+			if (!reportView.isActive()) {
+				throw new AdempiereException("@AD_ReportView_ID@ @NotActive@");
 			}
 			whereClause = "AD_ReportView_ID = ?";
 			parameters.add(reportView.getAD_ReportView_ID());
@@ -749,37 +966,55 @@ public class ReportManagement extends ReportManagementImplBase {
 						printFormat.getAD_PrintFormat_ID()
 					)
 					.setUuid(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							printFormat.getUUID()
 						)
 					)
 					.setName(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							printFormat.getName()
 						)
 					)
 					.setDescription(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							printFormat.getDescription()
 						)
 					)
 					.setIsDefault(
 						printFormat.isDefault()
 					)
+					.setIsForm(
+						printFormat.isForm()
+					)
+					.setIsStandardHeaderFooter(
+						printFormat.isStandardHeaderFooter()
+					)
 				;
 
 				if (printFormat.getAD_Table_ID() > 0) {
 					MTable table = MTable.get(Env.getCtx(), printFormat.getAD_Table_ID());
-					printFormatBuilder.setTableName(
-						ValueManager.validateNull(
-							table.getTableName()
+					printFormatBuilder.setTableId(
+							table.getAD_Table_ID()
 						)
-					);
+						.setTableName(
+							StringManager.getValidString(
+								table.getTableName()
+							)
+						)
+					;
 				}
 				if(printFormat.getAD_ReportView_ID() > 0) {
 					printFormatBuilder.setReportViewId(
 						printFormat.getAD_ReportView_ID()
 					);
+				}
+				if (printFormat.getJasperProcess_ID() > 0) {
+					MProcess process = MProcess.get(context, printFormat.getJasperProcess_ID());
+					if (!Util.isEmpty(process.getJasperReport(), true)) {
+						printFormatBuilder.setJasperProcessId(
+							process.getAD_Process_ID()
+						);
+					}
 				}
 				//	add
 				builder.addPrintFormats(printFormatBuilder);
@@ -802,7 +1037,7 @@ public class ReportManagement extends ReportManagementImplBase {
 			responseObserver.onNext(reportViewsList.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -831,7 +1066,13 @@ public class ReportManagement extends ReportManagementImplBase {
 			whereClause = "AD_Table_ID = ?";
 			parameters.add(table.getAD_Table_ID());
 		} else if(request.getReportId() > 0) {
-			whereClause = "EXISTS(SELECT 1 FROM AD_Process AS p WHERE p.AD_Process_ID = ? AND p.AD_ReportView_ID = AD_ReportView.AD_ReportView_ID)";
+			whereClause = "EXISTS("
+					+ "SELECT 1 FROM AD_Process AS p "
+					+ "WHERE p.AD_Process_ID = ? "
+					+ "AND p.AD_ReportView_ID = AD_ReportView.AD_ReportView_ID "
+					+ "AND p.IsActive = 'Y' "
+				+ ")"
+			;
 			parameters.add(request.getReportId());
 		} else {
 			throw new AdempiereException("@TableName@ / @AD_Process_ID@ @NotFound@");
@@ -881,7 +1122,8 @@ public class ReportManagement extends ReportManagementImplBase {
 					)
 						.setParameters(reportView.get_ID(), "Y", language)
 						.setOnlyActiveRecords(true)
-						.first();
+						.first()
+					;
 
 					if (translation != null) {
 						String nameTranslated = translation.get_ValueAsString(I_AD_ReportView.COLUMNNAME_Name);
@@ -900,25 +1142,29 @@ public class ReportManagement extends ReportManagementImplBase {
 						reportView.getAD_ReportView_ID()
 					)
 					.setUuid(
-						ValueManager.validateNull(
+						StringManager.getValidString(
 							reportView.getUUID()
 						)
 					)
 					.setName(
-						ValueManager.validateNull(name)
+						StringManager.getValidString(name)
 					)
 					.setDescription(
-						ValueManager.validateNull(description)
+						StringManager.getValidString(description)
 					)
 				;
 
 				if (reportView.getAD_ReportView_ID() > 0) {
 					MTable table = MTable.get(context, reportView.getAD_Table_ID());
-					reportViewBuilder.setTableName(
-						ValueManager.validateNull(
-							table.getTableName()
+					reportViewBuilder.setTableId(
+							table.getAD_Table_ID()
 						)
-					);
+						.setTableName(
+							StringManager.getValidString(
+								table.getTableName()
+							)
+						)
+					;
 				}
 				//	add
 				builder.addReportViews(reportViewBuilder);
@@ -939,12 +1185,14 @@ public class ReportManagement extends ReportManagementImplBase {
 			responseObserver.onNext(drillTablesList.build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
-			responseObserver.onError(Status.INTERNAL
+			responseObserver.onError(
+				Status.INTERNAL
 					.withDescription(e.getLocalizedMessage())
 					.withCause(e)
-					.asRuntimeException());
+					.asRuntimeException()
+			);
 		}
 	}
 
@@ -960,61 +1208,76 @@ public class ReportManagement extends ReportManagementImplBase {
 			throw new AdempiereException("@TableName@ @NotFound@");
 		}
 		MTable table = MTable.get(Env.getCtx(), request.getTableName());
-		String sql = "SELECT t.TableName, e.ColumnName, NULLIF(e.PO_PrintName,e.PrintName) "
-				+ "FROM AD_Column c "
-				+ " INNER JOIN AD_Column used ON (c.ColumnName=used.ColumnName)"
-				+ " INNER JOIN AD_Table t ON (used.AD_Table_ID=t.AD_Table_ID AND t.IsView='N' AND t.AD_Table_ID <> c.AD_Table_ID)"
-				+ " INNER JOIN AD_Column cKey ON (t.AD_Table_ID=cKey.AD_Table_ID AND cKey.IsKey='Y')"
-				+ " INNER JOIN AD_Element e ON (cKey.ColumnName=e.ColumnName) "
-				+ "WHERE c.AD_Table_ID=? AND c.IsKey='Y' "
-				+ "ORDER BY 3";
-			PreparedStatement pstmt = null;
-			ResultSet resultSet = null;
-			try {
-				pstmt = DB.prepareStatement(sql, null);
-				pstmt.setInt(1, table.getAD_Table_ID());
-				resultSet = pstmt.executeQuery();
-				int recordCount = 0;
-				while (resultSet.next()) {
-					String drillTableName = resultSet.getString("TableName");
-					String columnName = resultSet.getString("ColumnName");
-					M_Element element = M_Element.get(Env.getCtx(), columnName);
-					//	Add here
-					DrillTable.Builder drillTable = DrillTable.newBuilder();
-					drillTable.setTableName(
-						ValueManager.validateNull(drillTableName)
-					);
-					String name = element.getPrintName();
-					String poName = element.getPO_PrintName();
-					if(!Env.isBaseLanguage(Env.getCtx(), "")) {
-						String translation = element.get_Translation("PrintName");
-						if(!Util.isEmpty(translation)) {
-							name = translation;
-						}
-						translation = element.get_Translation("PO_PrintName");
-						if(!Util.isEmpty(translation)) {
-							poName = translation;
-						}
+		String sql = "SELECT t.AD_Table_ID, t.TableName, e.ColumnName, NULLIF(e.PO_PrintName, e.PrintName) "
+			+ "FROM AD_Column AS c "
+			+ "INNER JOIN AD_Column AS used "
+				+ "ON (c.ColumnName=used.ColumnName) "
+			+ "INNER JOIN AD_Table AS t "
+				+ "ON (used.AD_Table_ID=t.AD_Table_ID "
+				+ "AND t.IsView='N' "
+				+ "AND t.AD_Table_ID <> c.AD_Table_ID) "
+			+ "INNER JOIN AD_Column AS cKey "
+				+ "ON (t.AD_Table_ID=cKey.AD_Table_ID "
+				+ "AND cKey.IsKey='Y') "
+			+ "INNER JOIN AD_Element AS e "
+				+ "ON (cKey.ColumnName=e.ColumnName) "
+			+ "WHERE c.AD_Table_ID = ? AND c.IsKey ='Y' "
+			+ "ORDER BY 3"
+		;
+		PreparedStatement pstmt = null;
+		ResultSet resultSet = null;
+		try {
+			pstmt = DB.prepareStatement(sql, null);
+			pstmt.setInt(1, table.getAD_Table_ID());
+			resultSet = pstmt.executeQuery();
+			int recordCount = 0;
+			while (resultSet.next()) {
+				int drillTableId = resultSet.getInt("AD_Table_ID");
+				String drillTableName = resultSet.getString("TableName");
+				String columnName = resultSet.getString("ColumnName");
+				M_Element element = M_Element.get(Env.getCtx(), columnName);
+				//	Add here
+				DrillTable.Builder drillTable = DrillTable.newBuilder()
+					.setTableId(
+						drillTableId
+					)
+					.setTableName(
+						StringManager.getValidString(drillTableName)
+				);
+
+				String name = element.getPrintName();
+				String poName = element.getPO_PrintName();
+				if(!Env.isBaseLanguage(Env.getCtx(), "")) {
+					String translation = element.get_Translation("PrintName");
+					if(!Util.isEmpty(translation, true)) {
+						name = translation;
 					}
-					if(!Util.isEmpty(poName)) {
-						name = name + "/" + poName;
+					translation = element.get_Translation("PO_PrintName");
+					if(!Util.isEmpty(translation, true)) {
+						poName = translation;
 					}
-					//	Print Name
-					drillTable.setPrintName(
-						ValueManager.validateNull(name)
-					);
-					recordCount++;
-					//	Add to list
-					builder.addDrillTables(drillTable);
 				}
-				builder.setRecordCount(recordCount);
-				resultSet.close();
-				pstmt.close();
-			} catch (SQLException e) {
-				log.log(Level.SEVERE, sql, e);
-			} finally {
-				DB.close(resultSet, pstmt);
+				if(!Util.isEmpty(poName, true)) {
+					name = name + "/" + poName;
+				}
+				//	Print Name
+				drillTable.setPrintName(
+					StringManager.getValidString(name)
+				);
+				recordCount++;
+				//	Add to list
+				builder.addDrillTables(drillTable);
 			}
+			builder.setRecordCount(recordCount);
+			resultSet.close();
+			pstmt.close();
+		} catch (SQLException e) {
+			log.log(Level.SEVERE, sql, e);
+		} finally {
+			DB.close(resultSet, pstmt);
+			resultSet = null;
+			pstmt = null;
+		}
 		//	Return
 		return builder;
 	}

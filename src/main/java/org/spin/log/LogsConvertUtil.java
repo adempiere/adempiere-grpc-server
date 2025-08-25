@@ -49,6 +49,7 @@ import org.spin.backend.grpc.common.ReportOutput;
 import org.spin.backend.grpc.logs.ChangeLog;
 import org.spin.backend.grpc.logs.EntityEventType;
 import org.spin.backend.grpc.logs.EntityLog;
+import org.spin.service.grpc.util.value.StringManager;
 import org.spin.service.grpc.util.value.ValueManager;
 
 import com.google.protobuf.Struct;
@@ -68,13 +69,19 @@ public class LogsConvertUtil {
 	public static EntityLog.Builder convertRecordLogHeader(MChangeLog recordLog) {
 		MTable table = MTable.get(recordLog.getCtx(), recordLog.getAD_Table_ID());
 		EntityLog.Builder builder = EntityLog.newBuilder();
-		builder.setLogId(recordLog.getAD_ChangeLog_ID())
-			.setId(recordLog.getRecord_ID())
+		builder.setLogId(
+				recordLog.getAD_ChangeLog_ID()
+			)
+			.setId(
+				recordLog.getRecord_ID()
+			)
 			.setTableName(
-				ValueManager.validateNull(table.getTableName())
+				StringManager.getValidString(
+					table.getTableName()
+				)
 			)
 		;
-		
+
 		String displayedName = table.get_Translation(I_AD_Table.COLUMNNAME_Name);
 		if (table.getAD_Window_ID() > 0) {
 			MWindow window = MWindow.get(Env.getCtx(), table.getAD_Window_ID());
@@ -82,31 +89,45 @@ public class LogsConvertUtil {
 			builder.setWindowId(window.getAD_Window_ID());
 		}
 		builder.setDisplayedName(
-			ValueManager.validateNull(displayedName)
+			StringManager.getValidString(displayedName)
 		);
 
 		// created by
 		MUser user = MUser.get(recordLog.getCtx(), recordLog.getCreatedBy());
-		builder.setCreatedBy(user.getAD_User_ID())
+		builder.setCreatedBy(
+				user.getAD_User_ID()
+			)
 			.setCreatedByName(
-				ValueManager.validateNull(user.getName())
+				StringManager.getValidString(
+					user.getName()
+				)
 			)
 		;
 
 		// updated by
 		user = MUser.get(recordLog.getCtx(), recordLog.getUpdatedBy());
-		builder.setUpdatedBy(user.getAD_User_ID())
+		builder.setUpdatedBy(
+				user.getAD_User_ID()
+			)
 			.setUpdatedByName(
-				ValueManager.validateNull(user.getName())
+				StringManager.getValidString(
+					user.getName()
+				)
 			)
 		;
 
-		builder.setSessionId(recordLog.getAD_Session_ID())
+		builder.setSessionId(
+				recordLog.getAD_Session_ID()
+			)
 			.setTransactionName(
-				ValueManager.validateNull(recordLog.getTrxName())
+				StringManager.getValidString(
+					recordLog.getTrxName()
+				)
 			)
 			.setLogDate(
-				ValueManager.getTimestampFromDate(recordLog.getCreated())
+				ValueManager.getTimestampFromDate(
+					recordLog.getCreated()
+				)
 			)
 		;
 		if(recordLog.getEventChangeLog().endsWith(MChangeLog.EVENTCHANGELOG_Insert)) {
@@ -195,7 +216,9 @@ public class LogsConvertUtil {
 		ChangeLog.Builder builder = ChangeLog.newBuilder();
 		MColumn column = MColumn.get(recordLog.getCtx(), recordLog.getAD_Column_ID());
 		builder.setColumnName(
-			ValueManager.validateNull(column.getColumnName())
+			StringManager.getValidString(
+				column.getColumnName()
+			)
 		);
 		String displayColumnName = column.getName();
 		if(column.getColumnName().equals("ProcessedOn")) {
@@ -216,20 +239,22 @@ public class LogsConvertUtil {
 			}
 		}
 		builder.setDisplayColumnName(
-				ValueManager.validateNull(displayColumnName)
+				StringManager.getValidString(displayColumnName)
 			)
 			.setDescription(
-				ValueManager.validateNull(recordLog.getDescription())
+				StringManager.getValidString(
+					recordLog.getDescription()
+				)
 			)
 		;
 		String oldValue = recordLog.getOldValue();
 		String newValue = recordLog.getNewValue();
 		//	Set Old Value
 		builder.setOldValue(
-				ValueManager.validateNull(oldValue)
+			StringManager.getValidString(oldValue)
 			)
 			.setNewValue(
-				ValueManager.validateNull(newValue)
+				StringManager.getValidString(newValue)
 			)
 		;
 		//	Set Display Values
@@ -263,10 +288,10 @@ public class LogsConvertUtil {
 
 		//	Set display values
 		builder.setOldDisplayValue(
-				ValueManager.validateNull(displayOldValue)
+				StringManager.getValidString(displayOldValue)
 			)
 			.setNewDisplayValue(
-				ValueManager.validateNull(displayNewValue)
+				StringManager.getValidString(displayNewValue)
 			)
 		;
 		return builder;
@@ -293,32 +318,63 @@ public class LogsConvertUtil {
 				instance.getUpdated()
 			)
 		);
-		String summary = instance.getErrorMsg();
-		if(!Util.isEmpty(summary, true)) {
-			summary = Msg.parseTranslation(Env.getCtx(), summary);
-		}
+
 		//	for report
 		MProcess process = MProcess.get(Env.getCtx(), instance.getAD_Process_ID());
-		builder.setId(instance.getAD_Process_ID())
+		builder.setId(
+				process.getAD_Process_ID()
+			)
+			.setUuid(
+				StringManager.getValidString(
+					process.get_UUID()
+				)
+			)
 			.setName(
-				ValueManager.validateNull(process.getName()))
+				StringManager.getValidString(
+					process.getName()
+				)
+			)
 			.setDescription(
-				ValueManager.validateNull(process.getDescription())
+				StringManager.getValidString(
+					process.getDescription()
+				)
 			)
 		;
 		if(process.isReport()) {
-			ReportOutput.Builder outputBuilder = ReportOutput.newBuilder();
-			outputBuilder.setReportType(
-					ValueManager.validateNull(instance.getReportType())
+			ReportOutput.Builder outputBuilder = ReportOutput.newBuilder()
+				.setId(
+					instance.getAD_PInstance_ID()
+				)
+				.setUuid(
+					StringManager.getValidString(
+						instance.getUUID()
+					)
+				)
+				.setReportType(
+					StringManager.getValidString(
+						instance.getReportType()
+					)
 				)
 				.setName(
-					ValueManager.validateNull(instance.getName())
+					StringManager.getValidString(
+						instance.getName()
+					)
+				)
+				.setIsDirectPrint(
+					process.isDirectPrint()
 				)
 			;
-			builder.setOutput(outputBuilder.build());
+			builder.setOutput(
+				outputBuilder.build()
+			);
 		}
 		builder.setSummary(
-			ValueManager.validateNull(summary)
+			StringManager.getValidString(
+				Msg.parseTranslation(
+					Env.getCtx(),
+					instance.getErrorMsg()
+				)
+			)
 		);
 		List<X_AD_PInstance_Log> logList = new Query(
 			Env.getCtx(), I_AD_PInstance_Log.Table_Name,
@@ -336,7 +392,7 @@ public class LogsConvertUtil {
 				message = Msg.parseTranslation(Env.getCtx(), message);
 			}
 			logBuilder.setLog(
-				ValueManager.validateNull((message))
+				StringManager.getValidString(message)
 			);
 			builder.addLogs(logBuilder.build());
 		}
@@ -438,7 +494,7 @@ public class LogsConvertUtil {
 		}
 
 		builder.setColumnName(
-			ValueManager.validateNull(
+			StringManager.getValidString(
 				instancePara.getParameterName()
 			)
 		);
@@ -453,9 +509,11 @@ public class LogsConvertUtil {
 			}
 		}
 		if (processPara != null) {
-			builder.setId(processPara.getAD_Process_Para_ID())
+			builder.setId(
+					processPara.getAD_Process_Para_ID()
+				)
 				.setName(
-					ValueManager.validateNull(
+					StringManager.getValidString(
 						processPara.get_Translation(I_AD_Process_Para.COLUMNNAME_Name)
 					)
 				)

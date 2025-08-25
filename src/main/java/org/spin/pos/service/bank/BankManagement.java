@@ -17,10 +17,13 @@ package org.spin.pos.service.bank;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
+import org.adempiere.core.domains.models.I_C_BP_BankAccount;
 import org.adempiere.core.domains.models.I_C_Bank;
 import org.adempiere.core.domains.models.I_C_BankAccount;
 import org.adempiere.exceptions.AdempiereException;
+import org.compiere.model.MBPBankAccount;
 import org.compiere.model.MBank;
 import org.compiere.model.MRole;
 import org.compiere.model.Query;
@@ -36,7 +39,7 @@ import org.spin.grpc.service.core_functionality.CoreFunctionalityConvert;
 import org.spin.pos.util.POSConvertUtil;
 import org.spin.service.grpc.authentication.SessionManager;
 import org.spin.service.grpc.util.db.LimitUtil;
-import org.spin.service.grpc.util.value.ValueManager;
+import org.spin.service.grpc.util.value.StringManager;
 
 /**
  * A util class for change values for documents
@@ -59,11 +62,8 @@ public class BankManagement {
 		List<Object> filtersList = new ArrayList<>();
 
 		String whereClause = "BankType = 'B' ";
-		final String searchValue = ValueManager.getDecodeUrl(
-			request.getSearchValue()
-		);
-		if (!Util.isEmpty(searchValue, true)) {
-			filtersList.add(searchValue);
+		if (!Util.isEmpty(request.getSearchValue(), false)) {
+			filtersList.add(request.getSearchValue());
 			whereClause += "AND UPPER(Name) LIKE '%' || UPPER(?) || '%' ";
 		}
 
@@ -88,7 +88,7 @@ public class BankManagement {
 		ListBanksResponse.Builder builderList = ListBanksResponse.newBuilder()
 			.setRecordCount(recordCount)
 			.setNextPageToken(
-				ValueManager.validateNull(nexPageToken)
+				StringManager.getValidString(nexPageToken)
 			)
 		;
 
@@ -113,11 +113,8 @@ public class BankManagement {
 		List<Object> filtersList = new ArrayList<>();
 		filtersList.add(bank.getC_Bank_ID());
 		String whereClause = "C_Bank_ID = ? ";
-		final String searchValue = ValueManager.getDecodeUrl(
-			request.getSearchValue()
-		);
-		if (!Util.isEmpty(searchValue, true)) {
-			filtersList.add(searchValue);
+		if (!Util.isEmpty(request.getSearchValue(), false)) {
+			filtersList.add(request.getSearchValue());
 			whereClause = "AND UPPER(Name) LIKE '%' || UPPER(?) || '%' ";
 		}
 
@@ -145,6 +142,32 @@ public class BankManagement {
 			builderList.addRecords(bankAccountBuilder);
 		});
 		return builderList;
+	}
+
+
+
+	public static MBPBankAccount validateAndGetCustomerBankAccount(int customerBankAccountId) {
+		if (customerBankAccountId <= 0) {
+			throw new AdempiereException("@FillMandatory@ @C_BP_BankAccount_ID@");
+		}
+		MBPBankAccount customerBankAccount = new MBPBankAccount(Env.getCtx(), customerBankAccountId, null);
+		if (customerBankAccount == null || customerBankAccount.getC_BP_BankAccount_ID() <= 0) {
+			throw new AdempiereException("@C_BP_BankAccount_ID@ @NotFound@");
+		}
+		return customerBankAccount;
+	}
+
+	public static int getCustomerBankAccountFromAccount(Properties context, int customerId, int bankId, String accountNo, String businessPartnerCode) {
+		return new Query(
+			context,
+			I_C_BP_BankAccount.Table_Name,
+			"C_BPartner_ID = ? AND C_Bank_ID = ? AND AccountNo = ? AND A_Ident_SSN = ?",
+			null
+		)
+			.setParameters(customerId, bankId, accountNo, businessPartnerCode)
+			.setOnlyActiveRecords(true)
+			.firstId()
+		;
 	}
 
 }

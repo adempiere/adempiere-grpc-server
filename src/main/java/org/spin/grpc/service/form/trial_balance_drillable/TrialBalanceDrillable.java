@@ -20,7 +20,8 @@ import org.compiere.util.CLogger;
 import org.spin.backend.grpc.common.ListLookupItemsResponse;
 import org.spin.backend.grpc.form.trial_balance_drillable.ExportRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ExportResponse;
-import org.spin.backend.grpc.form.trial_balance_drillable.ListAccoutingKeysRequest;
+import org.spin.backend.grpc.form.trial_balance_drillable.GetDefaultPeriodRequest;
+import org.spin.backend.grpc.form.trial_balance_drillable.ListAccountingKeysRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListBudgetsRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListFactAcctSummaryRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListFactAcctSummaryResponse;
@@ -28,6 +29,7 @@ import org.spin.backend.grpc.form.trial_balance_drillable.ListOrganizationsReque
 import org.spin.backend.grpc.form.trial_balance_drillable.ListPeriodsRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListReportCubesRequest;
 import org.spin.backend.grpc.form.trial_balance_drillable.ListUser1Request;
+import org.spin.backend.grpc.form.trial_balance_drillable.Period;
 import org.spin.backend.grpc.form.trial_balance_drillable.TrialBalanceDrillableGrpc.TrialBalanceDrillableImplBase;
 
 import io.grpc.Status;
@@ -57,7 +59,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -83,7 +85,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -109,7 +111,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -121,6 +123,30 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 	}
 
 
+
+	@Override
+	public void getDefaultPeriod(GetDefaultPeriodRequest request,
+			StreamObserver<Period> responseObserver) {
+		try {
+			if (request == null) {
+				throw new AdempiereException("Periods Request Null");
+			}
+			Period.Builder builder = TrialBalanceDrillableServiceLogic.getDefaultPeriod(request);
+			responseObserver.onNext(
+				builder.build()
+			);
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.warning(e.getLocalizedMessage());
+			e.printStackTrace();
+			responseObserver.onError(
+				Status.INTERNAL
+					.withDescription(e.getLocalizedMessage())
+					.withCause(e)
+					.asRuntimeException()
+			);
+		}
+	}
 
 	@Override
 	public void listPeriods(ListPeriodsRequest request,
@@ -135,7 +161,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -149,19 +175,19 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 
 
 	@Override
-	public void listAccoutingKeys(ListAccoutingKeysRequest request,
+	public void listAccountingKeys(ListAccountingKeysRequest request,
 			StreamObserver<ListLookupItemsResponse> responseObserver) {
 		try {
 			if (request == null) {
-				throw new AdempiereException("Accoutings Request Null");
+				throw new AdempiereException("Accountings Request Null");
 			}
-			ListLookupItemsResponse.Builder builder = TrialBalanceDrillableServiceLogic.listAccoutingKeys(request);
+			ListLookupItemsResponse.Builder builder = TrialBalanceDrillableServiceLogic.listAccountingKeys(request);
 			responseObserver.onNext(
 				builder.build()
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -187,7 +213,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -213,7 +239,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			);
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL
@@ -236,7 +262,7 @@ public class TrialBalanceDrillable extends TrialBalanceDrillableImplBase {
 			responseObserver.onNext(ExportResponse.newBuilder().build());
 			responseObserver.onCompleted();
 		} catch (Exception e) {
-			log.severe(e.getLocalizedMessage());
+			log.warning(e.getLocalizedMessage());
 			e.printStackTrace();
 			responseObserver.onError(
 				Status.INTERNAL

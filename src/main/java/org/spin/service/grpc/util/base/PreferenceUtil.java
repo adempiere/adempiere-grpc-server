@@ -12,7 +12,7 @@
  * You should have received a copy of the GNU General Public License                *
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
-package org.spin.base.util;
+package org.spin.service.grpc.util.base;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +22,7 @@ import org.adempiere.core.domains.models.I_AD_Preference;
 import org.compiere.model.MPreference;
 import org.compiere.model.Query;
 import org.compiere.util.Env;
+import org.compiere.util.Util;
 
 public class PreferenceUtil {
 	/** Language			*/
@@ -66,6 +67,7 @@ public class PreferenceUtil {
 			"AD_User_ID = ? AND Attribute IN(?, ?, ?, ?, ?) AND AD_Window_ID Is NULL",
 			null
 		)
+			.setOrderBy(I_AD_Preference.COLUMNNAME_Created + " DESC")
 			.setParameters(queryParameters)
 			.<MPreference>list()
 		;
@@ -88,26 +90,55 @@ public class PreferenceUtil {
 		// values
 		String language, int roleId, int clientId, int organizationId, int warehouseId
 	) {
-		List<MPreference> preferencesList = PreferenceUtil.getSessionPreferences(userId);
-		for (MPreference preference: preferencesList) {
-			String attibuteName = preference.getAttribute();
-			if (attibuteName.equals(PreferenceUtil.P_ROLE)) {
+		if (userId <= 0) {
+			return;
+		}
+
+		Query query = new Query(
+			Env.getCtx(),
+			I_AD_Preference.Table_Name,
+			"AD_User_ID = ? AND Attribute = ? AND AD_Window_ID Is NULL",
+			null
+		)
+			.setOrderBy(I_AD_Preference.COLUMNNAME_Created + " DESC")
+		;
+
+		for (String attributeName : PROPERTIES_LIST) {
+			if (Util.isEmpty(attributeName, true)) {
+				// next iteration
+				continue;
+			}
+			MPreference preference = query
+				.setParameters(userId, attributeName)
+				.first()
+			;
+			if (preference == null) {
+				preference = new MPreference(Env.getCtx(), 0, null);
+				preference.setAD_User_ID(userId);
+				preference.setAttribute(attributeName);
+			} 
+			if (preference.getAD_Client_ID() > 0 || preference.getAD_Org_ID() > 0) {
+				preference.set_ValueOfColumn(I_AD_Preference.COLUMNNAME_AD_Client_ID, 0);
+				preference.set_ValueOfColumn(I_AD_Preference.COLUMNNAME_AD_Org_ID, 0);
+			}
+			// set values
+			if (attributeName.equals(PreferenceUtil.P_ROLE)) {
 				preference.setValue(
 					String.valueOf(roleId)
 				);
-			} else if (attibuteName.equals(PreferenceUtil.P_CLIENT)) {
+			} else if (attributeName.equals(PreferenceUtil.P_CLIENT)) {
 				preference.setValue(
 					String.valueOf(clientId)
 				);
-			} else if (attibuteName.equals(PreferenceUtil.P_ORG)) {
+			} else if (attributeName.equals(PreferenceUtil.P_ORG)) {
 				preference.setValue(
 					String.valueOf(organizationId)
 				);
-			} else if (attibuteName.equals(PreferenceUtil.P_WAREHOUSE)) {
+			} else if (attributeName.equals(PreferenceUtil.P_WAREHOUSE)) {
 				preference.setValue(
 					String.valueOf(warehouseId)
 				);
-			} else if (attibuteName.equals(PreferenceUtil.P_LANGUAGE)) {
+			} else if (attributeName.equals(PreferenceUtil.P_LANGUAGE)) {
 				preference.setValue(
 					language
 				);
