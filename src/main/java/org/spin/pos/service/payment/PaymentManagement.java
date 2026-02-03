@@ -21,11 +21,14 @@ import org.compiere.model.MDocType;
 import org.compiere.model.MOrder;
 import org.compiere.model.MPOS;
 import org.compiere.model.MPayment;
+import org.compiere.model.MTable;
 import org.compiere.model.PO;
+import org.compiere.model.POInfo;
 import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.spin.pos.service.pos.POS;
+import org.spin.service.grpc.util.base.RecordUtil;
 
 /**
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
@@ -41,6 +44,19 @@ public class PaymentManagement {
 		if (salesOrder == null || salesOrder.getC_Order_ID() <= 0) {
 			return false;
 		}
+
+		MTable paymentTable = RecordUtil.validateAndGetTable(
+			I_C_Payment.Table_Name
+		);
+		POInfo poInfo = POInfo.getPOInfo(Env.getCtx(), paymentTable.get_Table_ID());
+		// MPayment payment = new MPayment(salesOrder.getCtx(), 0, null);
+		if (poInfo.getColumnIndex("IsOnline") < 0) {
+			return false;
+		}
+		if (poInfo.getColumnIndex("ResponseStatus") < 0) {
+			return false;
+		}
+
 		// Exists Online Payment Approved
 		final String sql = "SELECT 1 "
 			+ "FROM C_Payment "
@@ -61,6 +77,19 @@ public class PaymentManagement {
 		if (salesOrder == null || salesOrder.getC_Order_ID() <= 0) {
 			return 0;
 		}
+
+		MTable paymentTable = RecordUtil.validateAndGetTable(
+			I_C_Payment.Table_Name
+		);
+		POInfo poInfo = POInfo.getPOInfo(Env.getCtx(), paymentTable.get_Table_ID());
+		// MPayment payment = new MPayment(salesOrder.getCtx(), 0, null);
+		if (poInfo.getColumnIndex("IsOnline") < 0) {
+			return -1;
+		}
+		if (poInfo.getColumnIndex("ResponseStatus") < 0) {
+			return -1;
+		}
+
 		// Exists Online Payment Approved
 		final String whereClause = "IsOnline = 'Y' "
 			+ "AND ResponseStatus <> 'A' "
