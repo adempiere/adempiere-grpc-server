@@ -8,12 +8,11 @@ plugins {
 	id "io.github.uoxx3.project-environment" version "1.0.1"
 }
 
-group 'com.nikhilm'
-
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_17
 }
+
 
 def grpcVersion = '1.63.0'
 def protobufVersion = '3.25.3'
