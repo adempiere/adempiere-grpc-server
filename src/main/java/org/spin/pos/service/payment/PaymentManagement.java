@@ -27,8 +27,9 @@ import org.compiere.model.POInfo;
 import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
+import org.spin.base.util.RecordUtil;
 import org.spin.pos.service.pos.POS;
-import org.spin.service.grpc.util.base.RecordUtil;
+// import org.spin.service.grpc.util.base.RecordUtil;
 
 /**
  * @author Edwin Betancourt, EdwinBetanc0urt@outlook.com, https://github.com/EdwinBetanc0urt
