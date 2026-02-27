@@ -570,13 +570,90 @@ public class OrderManagement {
 				transactionName
 			);
 
-			//	Add write off
-			if(!isOpenRefund
-					|| OrderUtil.isAutoWriteOff(salesOrder, openAmount.get())) {
+			//	Handle remaining amount (writeoff or refund)
+			if(!isOpenRefund || OrderUtil.isAutoWriteOff(salesOrder, openAmount.get())) {
 				if(openAmount.get().compareTo(Env.ZERO) != 0) {
-					MAllocationLine paymentAllocationLine = new MAllocationLine (paymentAllocation, Env.ZERO, Env.ZERO, openAmount.get(), Env.ZERO);
-					paymentAllocationLine.setDocInfo(salesOrder.getC_BPartner_ID(), salesOrder.getC_Order_ID(), invoiceId);
-					paymentAllocationLine.saveEx();
+
+					// Check if overpayment (negative openAmount = change to give back)
+					if(openAmount.get().compareTo(Env.ZERO) < 0) {
+						// OVERPAYMENT: Create refund payment for change
+						BigDecimal refundAmount = openAmount.get().abs();
+
+						// Get original payment to copy payment method and bank account
+						MPayment originalPayment = payments.stream()
+							.filter(p -> p.isReceipt())
+							.findFirst()
+							.orElse(null);
+
+						if(originalPayment != null) {
+							// Create refund payment
+							MPayment refundPayment = new MPayment(Env.getCtx(), 0, transactionName);
+							refundPayment.setC_Order_ID(salesOrder.getC_Order_ID());
+							refundPayment.setC_BPartner_ID(salesOrder.getC_BPartner_ID());
+
+							// Use POS withdrawal document type for outgoing payments
+							int withdrawalDocTypeId = pos.get_ValueAsInt("POSWithdrawalDocumentType_ID");
+							if (withdrawalDocTypeId > 0) {
+								refundPayment.setC_DocType_ID(withdrawalDocTypeId);
+							} else {
+								// Fallback: use default refund doc type
+								refundPayment.setC_DocType_ID(true);
+							}
+
+							refundPayment.setTenderType(originalPayment.getTenderType());
+							refundPayment.setPayAmt(refundAmount);
+							refundPayment.setIsReceipt(false); // Outgoing payment
+							refundPayment.setC_BankAccount_ID(originalPayment.getC_BankAccount_ID());
+
+							// Copy payment method from original payment
+							if (originalPayment.getC_PaymentMethod_ID() > 0) {
+								refundPayment.setC_PaymentMethod_ID(originalPayment.getC_PaymentMethod_ID());
+							}
+
+							// Copy conversion type from original payment
+							if (originalPayment.getC_ConversionType_ID() > 0) {
+								refundPayment.setC_ConversionType_ID(originalPayment.getC_ConversionType_ID());
+							}
+
+							refundPayment.setC_Currency_ID(salesOrder.getC_Currency_ID());
+							refundPayment.setDateTrx(salesOrder.getDateOrdered());
+							refundPayment.setDateAcct(salesOrder.getDateAcct());
+							refundPayment.setDescription("Change from order " + salesOrder.getDocumentNo());
+							refundPayment.setDocAction(MPayment.DOCACTION_Complete);
+							refundPayment.setC_POS_ID(pos.getC_POS_ID());
+							CashUtil.setCurrentDate(refundPayment);
+							refundPayment.saveEx(transactionName);
+
+							// Complete the refund payment
+							if (!refundPayment.processIt(MPayment.DOCACTION_Complete)) {
+								throw new AdempiereException("@ProcessFailed@ :" + refundPayment.getProcessMsg());
+							}
+							refundPayment.saveEx(transactionName);
+
+							// Create allocation line with payment reference
+							MAllocationLine refundLine = new MAllocationLine(
+								paymentAllocation,
+								refundAmount.negate(), // Negative amount for refund
+								Env.ZERO,
+								Env.ZERO,              // NO writeoff
+								Env.ZERO
+							);
+							refundLine.setDocInfo(salesOrder.getC_BPartner_ID(), salesOrder.getC_Order_ID(), invoiceId);
+							refundLine.setPaymentInfo(refundPayment.getC_Payment_ID(), 0); // Link payment!
+							refundLine.saveEx();
+
+							// Add to cash management
+							CashManagement.addPaymentToCash(pos, refundPayment);
+
+							// Mark as allocated
+							refundPayment.setIsAllocated(true);
+							refundPayment.setC_Invoice_ID(invoiceId);
+							refundPayment.saveEx(transactionName);
+						}
+					}
+					// UNDERPAYMENT: Do nothing - leave invoice with open balance
+					// Writeoff is an accounting task, not a POS function
+					// The invoice will remain partially unpaid
 				}
 			}
 
