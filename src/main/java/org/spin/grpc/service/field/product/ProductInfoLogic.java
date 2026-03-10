@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.field.product;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -132,12 +133,12 @@ public class ProductInfoLogic {
 		}
 
 		//	Ordered Date
-		Timestamp validPriceDate = ValueManager.getDateFromTimestampDate(
+		Timestamp validPriceDate = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDateOrdered()
 		);
 		//	Invocied Date
 		if (validPriceDate == null) {
-			validPriceDate = ValueManager.getDateFromTimestampDate(
+			validPriceDate = ValueManager.getTimestampFromProtoTimestamp(
 				request.getDateInvoiced()
 			);
 		}
@@ -426,7 +427,7 @@ public class ProductInfoLogic {
 			parametersList.add(true);
 		}
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -444,7 +445,7 @@ public class ProductInfoLogic {
 		}
 
 		// Value
-		final String value = ValueManager.getDecodeUrl(
+		final String value = TextManager.getDecodeUrl(
 			request.getValue()
 		);
 		if (!Util.isEmpty(value)) {
@@ -452,7 +453,7 @@ public class ProductInfoLogic {
 			parametersList.add(value);
 		}
 		// Name
-		final String name = ValueManager.getDecodeUrl(
+		final String name = TextManager.getDecodeUrl(
 			request.getName()
 		);
 		if (!Util.isEmpty(name)) {
@@ -460,7 +461,7 @@ public class ProductInfoLogic {
 			parametersList.add(name);
 		}
 		// UPC/EAN
-		final String upc = ValueManager.getDecodeUrl(
+		final String upc = TextManager.getDecodeUrl(
 			request.getUpc()
 		);
 		if (!Util.isEmpty(upc)) {
@@ -468,7 +469,7 @@ public class ProductInfoLogic {
 			parametersList.add(upc);
 		}
 		// SKU
-		final String sku = ValueManager.getDecodeUrl(
+		final String sku = TextManager.getDecodeUrl(
 			request.getSku()
 		);
 		if (!Util.isEmpty(sku)) {

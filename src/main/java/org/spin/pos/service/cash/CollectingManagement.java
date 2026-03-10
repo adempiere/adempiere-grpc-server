@@ -116,14 +116,14 @@ public class CollectingManagement {
 		);
 
 		payment.setAD_Org_ID(salesOrder.getAD_Org_ID());
-		Timestamp date = ValueManager.getDateFromTimestampDate(
+		Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 			request.getPaymentDate()
 		);
 		if(date != null) {
 			payment.setDateTrx(date);
 			payment.setDateAcct(date);
 		}
-		Timestamp dateValue = ValueManager.getDateFromTimestampDate(
+		Timestamp dateValue = ValueManager.getTimestampFromProtoTimestamp(
 			request.getPaymentAccountDate()
 		);
 		if(dateValue != null) {

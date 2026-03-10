@@ -15,6 +15,7 @@
  *************************************************************************************/
 
 package org.spin.grpc.service.dictionary;
+import org.spin.service.grpc.util.base.RecordUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -292,17 +293,17 @@ public class DictionaryConvertUtil {
 			)
 			.setName(
 				StringManager.getValidString(
-					ValueManager.getTranslation(form, MForm.COLUMNNAME_Name)
+					RecordUtil.getTranslation(form, MForm.COLUMNNAME_Name)
 				)
 			)
 			.setDescription(
 				StringManager.getValidString(
-					ValueManager.getTranslation(form, MForm.COLUMNNAME_Description)
+					RecordUtil.getTranslation(form, MForm.COLUMNNAME_Description)
 				)
 			)
 			.setHelp(
 				StringManager.getValidString(
-					ValueManager.getTranslation(form, MForm.COLUMNNAME_Help)
+					RecordUtil.getTranslation(form, MForm.COLUMNNAME_Help)
 				)
 			)
 			.setIsActive(
@@ -615,17 +616,17 @@ public class DictionaryConvertUtil {
 			)
 			.setName(
 				StringManager.getValidString(
-					ValueManager.getTranslation(element, M_Element.COLUMNNAME_Name)
+					RecordUtil.getTranslation(element, M_Element.COLUMNNAME_Name)
 				)
 			)
 			.setDescription(
 				StringManager.getValidString(
-					ValueManager.getTranslation(element, M_Element.COLUMNNAME_Description)
+					RecordUtil.getTranslation(element, M_Element.COLUMNNAME_Description)
 				)
 			)
 			.setHelp(
 				StringManager.getValidString(
-					ValueManager.getTranslation(element, M_Element.COLUMNNAME_Help))
+					RecordUtil.getTranslation(element, M_Element.COLUMNNAME_Help))
 				)
 			.setColumnName(
 				StringManager.getValidString(

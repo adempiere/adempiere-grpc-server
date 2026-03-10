@@ -1093,8 +1093,8 @@ public class GeneralLedgerService extends GeneralLedgerImplBase {
 		}
 
 		// Date
-		Timestamp dateFrom = ValueManager.getDateFromTimestampDate(request.getDateFrom());
-		Timestamp dateTo = ValueManager.getDateFromTimestampDate(request.getDateTo());
+		Timestamp dateFrom = ValueManager.getTimestampFromProtoTimestamp(request.getDateFrom());
+		Timestamp dateTo = ValueManager.getTimestampFromProtoTimestamp(request.getDateTo());
 		if (dateFrom != null || dateTo != null) {
 			whereClause.append(" AND ");
 			if (dateFrom != null && dateTo != null) {

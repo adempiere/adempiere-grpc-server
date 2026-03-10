@@ -559,8 +559,8 @@ public class CashServiceLogic {
 			);
 		}
 		if (request.hasDateFrom() && request.hasDateTo()) {
-			dateFrom = ValueManager.getDateFromTimestampDate(request.getDateFrom());
-			dateTo = ValueManager.getDateFromTimestampDate(request.getDateTo());
+			dateFrom = ValueManager.getTimestampFromProtoTimestamp(request.getDateFrom());
+			dateTo = ValueManager.getTimestampFromProtoTimestamp(request.getDateTo());
 		} else {
 			Timestamp nowTimestamp = new Timestamp(System.currentTimeMillis());
 			dateFrom = TimeUtil.getDay(nowTimestamp);

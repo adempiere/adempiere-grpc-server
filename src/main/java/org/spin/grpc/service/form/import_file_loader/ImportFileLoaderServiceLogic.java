@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.form.import_file_loader;
+import org.spin.service.grpc.util.value.TextManager;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -118,7 +119,7 @@ public class ImportFileLoaderServiceLogic {
 			.setRecordCount(charsetsList.size())
 		;
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

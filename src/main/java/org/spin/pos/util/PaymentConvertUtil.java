@@ -14,6 +14,7 @@
  ************************************************************************************/
 
 package org.spin.pos.util;
+import org.spin.service.grpc.util.base.RecordUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -383,13 +384,13 @@ public class PaymentConvertUtil {
 						payment.getDocStatus()
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(
+						RecordUtil.getTranslation(
 							reference,
 							I_AD_Ref_List.COLUMNNAME_Name
 						)
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(
+						RecordUtil.getTranslation(
 							reference,
 							I_AD_Ref_List.COLUMNNAME_Description
 						)

@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.field.field_management;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -272,7 +273,7 @@ public class FieldManagementLogic {
 		if (Optional.ofNullable(request.getValue()).isPresent()
 			&& !Util.isEmpty(request.getValue().getStringValue())) {
 			// URL decode to change characteres
-			// final String overwriteValue = ValueManager.getDecodeUrl(defaultValue);
+			// final String overwriteValue = TextManager.getDecodeUrl(defaultValue);
 			final String overwriteValue = request.getValue().getStringValue();
 			defaultValue = overwriteValue;
 		}

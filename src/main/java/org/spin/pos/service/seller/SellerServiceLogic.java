@@ -15,6 +15,7 @@
  *************************************************************************************/
 
 package org.spin.pos.service.seller;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +78,7 @@ public class SellerServiceLogic {
 			);
 		}
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 				request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {

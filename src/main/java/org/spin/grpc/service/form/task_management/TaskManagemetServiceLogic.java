@@ -38,7 +38,7 @@ public class TaskManagemetServiceLogic {
 	public static ListTasksResponse.Builder listTasks(ListTasksRequest request) throws ParseException {
 		Timestamp date = new Timestamp(System.currentTimeMillis());
 		if(request.getDate() != null && (request.getDate().getSeconds() > 0 || request.getDate().getNanos() > 0)) {
-			date = ValueManager.getDateFromTimestampDate(
+			date = ValueManager.getTimestampFromProtoTimestamp(
 				request.getDate()
 			);
 		}

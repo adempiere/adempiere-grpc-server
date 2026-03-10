@@ -14,6 +14,7 @@
  ************************************************************************************/
 
 package org.spin.grpc.service;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -115,7 +116,7 @@ public class UserCustomization extends UserCustomizationImplBase {
 		String whereClause = "";
 		List<Object> parameters = new ArrayList<>();
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -225,7 +226,7 @@ public class UserCustomization extends UserCustomizationImplBase {
 		List<Object> parameters = new ArrayList<>();
 		String whereClause = "";
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -330,7 +331,7 @@ public class UserCustomization extends UserCustomizationImplBase {
 		List<Object> parameters = new ArrayList<>();
 		String whereClause = "";
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

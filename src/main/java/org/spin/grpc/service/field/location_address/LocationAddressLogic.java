@@ -1,4 +1,5 @@
 package org.spin.grpc.service.field.location_address;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ public class LocationAddressLogic {
 		String whereClause = null;
 		List<Object> parameters = new ArrayList<Object>();
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -142,7 +143,7 @@ public class LocationAddressLogic {
 		List<Object> parameters = new ArrayList<Object>();
 		parameters.add(country.getC_Country_ID());
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -203,7 +204,7 @@ public class LocationAddressLogic {
 			}
 		}
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

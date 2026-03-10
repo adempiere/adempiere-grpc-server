@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -415,7 +416,7 @@ public class MaterialManagement extends MaterialManagementImplBase {
 		parameters.add(productAttributeSetId);
 
 		// Add search value to filter
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -838,7 +839,7 @@ public class MaterialManagement extends MaterialManagementImplBase {
 		}
 
 		// Add search value to filter
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -988,7 +989,7 @@ public class MaterialManagement extends MaterialManagementImplBase {
 		}
 
 		// Add search value to filter
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

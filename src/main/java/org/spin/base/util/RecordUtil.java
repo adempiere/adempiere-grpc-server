@@ -14,6 +14,7 @@
  * Contributor(s): Yamel Senih www.erpya.com                                         *
  *************************************************************************************/
 package org.spin.base.util;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -411,7 +412,7 @@ public class RecordUtil {
 		}
 
 		// URL decode to change characteres
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			search_value
 		);
 

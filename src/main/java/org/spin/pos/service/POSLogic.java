@@ -14,6 +14,7 @@
  ************************************************************************************/
 
 package org.spin.pos.service;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -287,7 +288,7 @@ public class POSLogic {
 		List<Object> parameters = new ArrayList<Object>();
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {
@@ -448,7 +449,7 @@ public class POSLogic {
 		List<Object> parameters = new ArrayList<Object>();
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {

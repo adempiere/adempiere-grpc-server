@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.form;
+import org.spin.service.grpc.util.value.TextManager;
 
 import org.adempiere.exceptions.AdempiereException;
 
@@ -113,7 +114,7 @@ public class ExpressShipment extends ExpressShipmentImplBase {
 		List<Object> parameters = new ArrayList<Object>();
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -250,7 +251,7 @@ public class ExpressShipment extends ExpressShipmentImplBase {
 		parameters.add(businessPartnerId);
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -362,7 +363,7 @@ public class ExpressShipment extends ExpressShipmentImplBase {
 		parameters.add(orderId);
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

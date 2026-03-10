@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -2320,7 +2321,7 @@ public class PointOfSalesForm extends StoreImplBase {
 			parameters.add(pos.getAD_Org_ID());
 
 			// search value
-			final String searchValue = ValueManager.getDecodeUrl(
+			final String searchValue = TextManager.getDecodeUrl(
 				request.getSearchValue()
 			);
 			if(!Util.isEmpty(searchValue, true)) {
@@ -3832,22 +3833,22 @@ public class PointOfSalesForm extends StoreImplBase {
 			;
 		}
 		//	Date Order From
-		if(ValueManager.getDateFromTimestampDate(request.getDateOrderedFrom()) != null) {
+		if(ValueManager.getTimestampFromProtoTimestamp(request.getDateOrderedFrom()) != null) {
 			whereClause.append(" AND DateOrdered >= ?");
 			parameters.add(
 				TimeUtil.getDay(
-					ValueManager.getDateFromTimestampDate(
+					ValueManager.getTimestampFromProtoTimestamp(
 						request.getDateOrderedFrom()
 					)
 				)
 			);
 		}
 		//	Date Order To
-		if(ValueManager.getDateFromTimestampDate(request.getDateOrderedTo()) != null) {
+		if(ValueManager.getTimestampFromProtoTimestamp(request.getDateOrderedTo()) != null) {
 			whereClause.append(" AND DateOrdered <= ?");
 			parameters.add(
 				TimeUtil.getDay(
-					ValueManager.getDateFromTimestampDate(
+					ValueManager.getTimestampFromProtoTimestamp(
 						request.getDateOrderedTo()
 					)
 				)
@@ -5465,16 +5466,16 @@ public class PointOfSalesForm extends StoreImplBase {
 			if(!Util.isEmpty(tenderType)) {
 				payment.setTenderType(tenderType);
 			}
-			if(ValueManager.getDateFromTimestampDate(request.getPaymentDate()) != null) {
-				Timestamp date = ValueManager.getDateFromTimestampDate(
+			if(ValueManager.getTimestampFromProtoTimestamp(request.getPaymentDate()) != null) {
+				Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 					request.getPaymentDate()
 				);
 				if(date != null) {
 					payment.setDateTrx(date);
 				}
 			}
-			if(ValueManager.getDateFromTimestampDate(request.getPaymentAccountDate()) != null) {
-				Timestamp date = ValueManager.getDateFromTimestampDate(
+			if(ValueManager.getTimestampFromProtoTimestamp(request.getPaymentAccountDate()) != null) {
+				Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 					request.getPaymentAccountDate()
 				);
 				if(date != null) {
@@ -5567,7 +5568,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		List<Object> parameters = new ArrayList<Object>();
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {
@@ -5796,7 +5797,7 @@ public class PointOfSalesForm extends StoreImplBase {
 		//	Get Product
 		MProduct product = null;
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {

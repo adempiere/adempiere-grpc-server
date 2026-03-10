@@ -560,7 +560,7 @@ public class IssueManagement extends IssueManagementImplBase {
 			)
 		);
 		requestRecord.setDateNextAction(
-			ValueManager.getDateFromTimestampDate(request.getDateNextAction())
+			ValueManager.getTimestampFromProtoTimestamp(request.getDateNextAction())
 		);
 		
 		requestRecord.setR_Status_ID(request.getStatusId());
@@ -763,11 +763,11 @@ public class IssueManagement extends IssueManagementImplBase {
 
 		issueCommentsList.stream()
 			.sorted((comment1, comment2) -> {
-				Timestamp from = ValueManager.getDateFromTimestampDate(
+				Timestamp from = ValueManager.getTimestampFromProtoTimestamp(
 					comment1.getCreated()
 				);
 
-				Timestamp to = ValueManager.getDateFromTimestampDate(
+				Timestamp to = ValueManager.getTimestampFromProtoTimestamp(
 					comment2.getCreated()
 				);
 

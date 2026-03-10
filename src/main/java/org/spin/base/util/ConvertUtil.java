@@ -14,6 +14,7 @@
  * Contributor(s): Yamel Senih www.erpya.com                                         *
  *************************************************************************************/
 package org.spin.base.util;
+import org.spin.service.grpc.util.base.RecordUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -495,10 +496,10 @@ public class ConvertUtil {
 						order.getDocStatus()
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Name)
+						RecordUtil.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Name)
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Description)
+						RecordUtil.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Description)
 					)
 				)
 			)
@@ -885,10 +886,10 @@ public class ConvertUtil {
 						shipment.getDocStatus()
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Name)
+						RecordUtil.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Name)
 					),
 					StringManager.getValidString(
-						ValueManager.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Description)
+						RecordUtil.getTranslation(reference, I_AD_Ref_List.COLUMNNAME_Description)
 					)
 				)
 			)

@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.form.match_po_receipt_invoice;
+import org.spin.service.grpc.util.value.TextManager;
 
 import org.adempiere.exceptions.AdempiereException;
 
@@ -453,7 +454,7 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 		List<Object> parameters = new ArrayList<Object>();
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -593,10 +594,10 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 		}
 
 		// Date filter
-		Timestamp dateFrom = ValueManager.getDateFromTimestampDate(
+		Timestamp dateFrom = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDateFrom()
 		);
-		Timestamp dateTo = ValueManager.getDateFromTimestampDate(
+		Timestamp dateTo = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDateTo()
 		);
 		if (dateFrom != null && dateTo != null) {
@@ -696,10 +697,10 @@ public class MatchPOReceiptInvoice extends MatchPORReceiptInvoiceImplBase {
 		whereClause += " AND lin.M_Product_ID = " + request.getProductId();
 
 		// Date filter
-		Timestamp dateFrom = ValueManager.getDateFromTimestampDate(
+		Timestamp dateFrom = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDateFrom()
 		);
-		Timestamp dateTo = ValueManager.getDateFromTimestampDate(
+		Timestamp dateTo = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDateTo()
 		);
 		if (dateFrom != null && dateTo != null) {

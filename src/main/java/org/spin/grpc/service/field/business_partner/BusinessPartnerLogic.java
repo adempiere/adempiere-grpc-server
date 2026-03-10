@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.field.business_partner;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -145,7 +146,7 @@ public class BusinessPartnerLogic {
 		}
 
 		//	For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if(!Util.isEmpty(searchValue, true)) {
@@ -176,7 +177,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(request.getIsVendor());
 		}
 		// Value
-		final String value = ValueManager.getDecodeUrl(
+		final String value = TextManager.getDecodeUrl(
 			request.getValue()
 		);
 		if (!Util.isEmpty(value)) {
@@ -184,7 +185,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(value);
 		}
 		// Name
-		final String name = ValueManager.getDecodeUrl(
+		final String name = TextManager.getDecodeUrl(
 			request.getName()
 		);
 		if (!Util.isEmpty(name)) {
@@ -192,7 +193,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(name);
 		}
 		// Contact
-		final String contact = ValueManager.getDecodeUrl(
+		final String contact = TextManager.getDecodeUrl(
 			request.getContact()
 		);
 		if (!Util.isEmpty(contact)) {
@@ -201,7 +202,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(contact);
 		}
 		// E-Mail
-		final String eMail = ValueManager.getDecodeUrl(
+		final String eMail = TextManager.getDecodeUrl(
 			request.getEmail()
 		);
 		if (!Util.isEmpty(eMail, true)) {
@@ -210,7 +211,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(eMail);
 		}
 		// Phone
-		final String phone = ValueManager.getDecodeUrl(
+		final String phone = TextManager.getDecodeUrl(
 			request.getPhone()
 		);
 		if (!Util.isEmpty(phone)) {
@@ -219,7 +220,7 @@ public class BusinessPartnerLogic {
 			parametersList.add(phone);
 		}
 		// Postal Code
-		final String postalCode = ValueManager.getDecodeUrl(
+		final String postalCode = TextManager.getDecodeUrl(
 			request.getPostalCode()
 		);
 		if (!Util.isEmpty(postalCode)) {

@@ -399,7 +399,7 @@ public class CoreFunctionality extends CoreFunctionalityImplBase {
 			return null;
 		}
 		//	Get values
-		Timestamp conversionDate = ValueManager.getDateFromTimestampDate(request.getConversionDate());
+		Timestamp conversionDate = ValueManager.getTimestampFromProtoTimestamp(request.getConversionDate());
 		if(conversionDate == null) {
 			conversionDate = TimeUtil.getDay(System.currentTimeMillis());
 		}

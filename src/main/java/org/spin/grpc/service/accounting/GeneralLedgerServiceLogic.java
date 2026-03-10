@@ -633,7 +633,7 @@ public class GeneralLedgerServiceLogic {
 			}
 
 			if (dateFrom == null) {
-				Timestamp date = ValueManager.getDateFromTimestampDate(
+				Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 					request.getDate()
 				);
 				dateFrom = TimeUtil.getDay(date); // Remove time mark

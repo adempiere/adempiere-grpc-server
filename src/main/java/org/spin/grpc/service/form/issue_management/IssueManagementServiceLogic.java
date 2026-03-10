@@ -13,6 +13,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.            *
  ************************************************************************************/
 package org.spin.grpc.service.form.issue_management;
+import org.spin.service.grpc.util.value.TextManager;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -85,7 +86,7 @@ public class IssueManagementServiceLogic {
 		String whereClause = null;
 		List<Object> filtersList = new ArrayList<>();
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -143,7 +144,7 @@ public class IssueManagementServiceLogic {
 		;
 		List<Object> filtersList = new ArrayList<>();
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -198,7 +199,7 @@ public class IssueManagementServiceLogic {
 		List<Object> filtersList = new ArrayList<>();
 		filtersList.add(X_R_Request.PRIORITY_AD_Reference_ID);
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -253,7 +254,7 @@ public class IssueManagementServiceLogic {
 		StringBuffer whereClause = new StringBuffer();
 
 		//		For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -323,7 +324,7 @@ public class IssueManagementServiceLogic {
 		List<Object> filtersList = new ArrayList<>();
 		filtersList.add(requestTypeId);
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -380,7 +381,7 @@ public class IssueManagementServiceLogic {
 		StringBuffer whereClause = new StringBuffer();
 
 		//		For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -439,7 +440,7 @@ public class IssueManagementServiceLogic {
 		StringBuffer whereClause = new StringBuffer();
 
 		//		For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -499,7 +500,7 @@ public class IssueManagementServiceLogic {
 		List<Object> filtersList = new ArrayList<>();
 		filtersList.add(X_R_Request.TASKSTATUS_AD_Reference_ID);
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -554,7 +555,7 @@ public class IssueManagementServiceLogic {
 		StringBuffer whereClause = new StringBuffer();
 
 		//		For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -617,7 +618,7 @@ public class IssueManagementServiceLogic {
 		StringBuffer whereClause = new StringBuffer();
 
 		//		For search value
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -717,7 +718,7 @@ public class IssueManagementServiceLogic {
 			+ "AND (SalesRep_ID=? OR AD_Role_ID = ?) "
 		;
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {
@@ -811,8 +812,8 @@ public class IssueManagementServiceLogic {
 		}
 
 		// Created Date
-		Timestamp createdFrom = ValueManager.getDateFromTimestampDate(request.getCreatedFrom());
-		Timestamp createdTo = ValueManager.getDateFromTimestampDate(request.getCreatedTo());
+		Timestamp createdFrom = ValueManager.getTimestampFromProtoTimestamp(request.getCreatedFrom());
+		Timestamp createdTo = ValueManager.getTimestampFromProtoTimestamp(request.getCreatedTo());
 		if (createdFrom != null || createdTo != null) {
 			whereClause += " AND ";
 			if (createdFrom != null && createdTo != null) {
@@ -832,8 +833,8 @@ public class IssueManagementServiceLogic {
 		}
 
 		// Date Next Action
-		Timestamp dateNextActionFrom = ValueManager.getDateFromTimestampDate(request.getDateNextActionFrom());
-		Timestamp dateNextActionTo = ValueManager.getDateFromTimestampDate(request.getDateNextActionFrom());
+		Timestamp dateNextActionFrom = ValueManager.getTimestampFromProtoTimestamp(request.getDateNextActionFrom());
+		Timestamp dateNextActionTo = ValueManager.getTimestampFromProtoTimestamp(request.getDateNextActionFrom());
 		whereClause += " AND (DateNextAction IS NULL ";
 		if (dateNextActionFrom != null || dateNextActionTo != null) {
 			if (dateNextActionFrom != null && dateNextActionTo != null) {
@@ -922,7 +923,7 @@ public class IssueManagementServiceLogic {
 		List<Object> parametersList = new ArrayList<>();
 		String whereClause = "Processed='N' ";
 
-		final String searchValue = ValueManager.getDecodeUrl(
+		final String searchValue = TextManager.getDecodeUrl(
 			request.getSearchValue()
 		);
 		if (!Util.isEmpty(searchValue, true)) {

@@ -379,7 +379,7 @@ public class PaymentAllocationLogic {
 				conversionType.saveEx();
 			}
 
-			Timestamp date = ValueManager.getDateFromTimestampDate(
+			Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 				request.getDate()
 			);
 			final Timestamp dateFrom = TimeUtil.getDay(date); // Remove time mark
@@ -468,7 +468,7 @@ public class PaymentAllocationLogic {
 		int businessPartnerId = request.getBusinessPartnerId();
 		validateAndGetBusinessPartner(businessPartnerId);
 
-		Timestamp date = ValueManager.getDateFromTimestampDate(
+		Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDate()
 		);
 		date = TimeUtil.getDay(date); // Remove time mark
@@ -665,7 +665,7 @@ public class PaymentAllocationLogic {
 		int businessPartnerId = request.getBusinessPartnerId();
 		validateAndGetBusinessPartner(businessPartnerId);
 
-		Timestamp date = ValueManager.getDateFromTimestampDate(
+		Timestamp date = ValueManager.getTimestampFromProtoTimestamp(
 			request.getDate()
 		);
 		date = TimeUtil.getDay(date); // Remove time mark
@@ -926,14 +926,14 @@ public class PaymentAllocationLogic {
 	public static Timestamp getTransactionDate(List<PaymentSelection> paymentSelection, List<InvoiceSelection> invoiceSelection) {
 		AtomicReference<Timestamp> transactionDateReference = new AtomicReference<Timestamp>();
 		paymentSelection.forEach(paymentSelected -> {
-			Timestamp paymentDate = ValueManager.getDateFromTimestampDate(
+			Timestamp paymentDate = ValueManager.getTimestampFromProtoTimestamp(
 				paymentSelected.getTransactionDate()
 			);
 			Timestamp transactionDate = TimeUtil.max(transactionDateReference.get(), paymentDate);
 			transactionDateReference.set(transactionDate);
 		});
 		invoiceSelection.forEach(invoiceSelected -> {
-			Timestamp invoiceDate = ValueManager.getDateFromTimestampDate(
+			Timestamp invoiceDate = ValueManager.getTimestampFromProtoTimestamp(
 				invoiceSelected.getDateInvoiced()
 			);
 			Timestamp transactionDate = TimeUtil.max(transactionDateReference.get(), invoiceDate);
@@ -960,7 +960,7 @@ public class PaymentAllocationLogic {
 
 		Trx.run(transactionName -> {
 			// transaction date
-			Timestamp transactionDate = ValueManager.getDateFromTimestampDate(
+			Timestamp transactionDate = ValueManager.getTimestampFromProtoTimestamp(
 				request.getDate()
 			);
 			if (transactionDate == null) {
