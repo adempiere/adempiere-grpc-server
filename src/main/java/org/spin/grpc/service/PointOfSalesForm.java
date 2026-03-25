@@ -4961,6 +4961,8 @@ public class PointOfSalesForm extends StoreImplBase {
 				}
 				orderLine.setQty(quantityToOrder);
 				orderLine.setPrice();
+				orderLine.setPriceList(orderLine.getPriceActual());  // PriceList = selling price → 0% gap
+				orderLine.setDiscount(Env.ZERO);                     // clear stale discount from setPrice()
 				orderLine.setTax();
 				//	Save Line
 				orderLine.saveEx(transactionName);
@@ -5054,7 +5056,10 @@ public class PointOfSalesForm extends StoreImplBase {
 			orderLine.set_ValueOfColumn("Ref_WarehouseSource_ID", warehouseId);
 		}
 		//	Validate UOM
-		OrderUtil.updateUomAndQuantity(orderLine, unitOfMeasureId, quantityToChange);
+		// Use prepareUomAndQuantity (no internal saveEx) so all dirty fields are
+		// committed in a single saveEx(transactionName), triggering a full
+		// c_Order header recalculation (grand_total, tax, footer totals).
+		OrderUtil.prepareUomAndQuantity(orderLine, unitOfMeasureId, quantityToChange);
 		//	Set values
 		orderLine.setTax();
 		orderLine.saveEx(transactionName);

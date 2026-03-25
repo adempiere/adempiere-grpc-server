@@ -288,7 +288,21 @@ public class OrderConverUtil {
 			)
 			.setTaxAmount(
 				NumberManager.getBigDecimalToString(
-					grandTotal.subtract(totalLines.add(discountAmount)).setScale(
+					(priceList.isTaxIncluded()
+						? orderLines.stream()
+							.filter(ol -> defaultDiscountChargeId <= 0 || ol.getC_Charge_ID() != defaultDiscountChargeId)
+							.map(ol -> {
+								if (ol.getC_Tax_ID() <= 0) return Env.ZERO;
+								MTax lineTax = MTax.get(Env.getCtx(), ol.getC_Tax_ID());
+								return lineTax.calculateTax(
+									Optional.ofNullable(ol.getLineNetAmt()).orElse(Env.ZERO),
+									true,
+									priceList.getStandardPrecision()
+								);
+							})
+							.reduce(Env.ZERO, BigDecimal::add)
+						: grandTotal.subtract(totalLines.add(discountAmount))
+					).setScale(
 						priceList.getStandardPrecision(),
 						RoundingMode.HALF_UP
 					)
@@ -426,9 +440,10 @@ public class OrderConverUtil {
 		BigDecimal priceBaseTaxAmount = tax.calculateTax(priceBaseAmount, priceList.isTaxIncluded(), priceList.getStandardPrecision());
 		BigDecimal priceListTaxAmount = tax.calculateTax(priceListAmount, priceList.isTaxIncluded(), priceList.getStandardPrecision());
 		//	Prices with tax
-		BigDecimal priceListWithTaxAmount = priceListAmount.add(priceListTaxAmount);
-		BigDecimal priceBaseWithTaxAmount = priceBaseAmount.add(priceBaseTaxAmount);
-		BigDecimal priceWithTaxAmount = priceAmount.add(priceTaxAmount);
+		boolean isTaxIncluded = priceList.isTaxIncluded();
+		BigDecimal priceListWithTaxAmount = isTaxIncluded ? priceListAmount : priceListAmount.add(priceListTaxAmount);
+		BigDecimal priceBaseWithTaxAmount = isTaxIncluded ? priceBaseAmount : priceBaseAmount.add(priceBaseTaxAmount);
+		BigDecimal priceWithTaxAmount     = isTaxIncluded ? priceAmount     : priceAmount.add(priceTaxAmount);
 		//	Totals
 		BigDecimal totalDiscountAmount = discountAmount.multiply(quantityOrdered);
 		BigDecimal totalAmount = orderLine.getLineNetAmt();
@@ -441,8 +456,8 @@ public class OrderConverUtil {
 		);
 		BigDecimal totalBaseAmount = totalAmount.subtract(totalDiscountAmount);
 		BigDecimal totalTaxAmount = tax.calculateTax(totalAmount, priceList.isTaxIncluded(), priceList.getStandardPrecision());
-		BigDecimal totalBaseAmountWithTax = totalBaseAmount.add(totalTaxAmount);
-		BigDecimal totalAmountWithTax = totalAmount.add(totalTaxAmount);
+		BigDecimal totalBaseAmountWithTax = isTaxIncluded ? totalBaseAmount : totalBaseAmount.add(totalTaxAmount);
+		BigDecimal totalAmountWithTax     = isTaxIncluded ? totalAmount     : totalAmount.add(totalTaxAmount);
 		BigDecimal totalAmountWithTaxConverted = OrderUtil.getConvertedAmountTo(
 			order,
 			pos.get_ValueAsInt(
