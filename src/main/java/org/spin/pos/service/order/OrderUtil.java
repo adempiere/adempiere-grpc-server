@@ -120,19 +120,78 @@ public class OrderUtil {
 	 * @param unitOfMeasureId
 	 * @param quantity
 	 */
-	public static void updateUomAndQuantity(MOrderLine orderLine, int unitOfMeasureId, BigDecimal quantity) {
+	/**
+	 * Prepare UOM and quantity changes on an order line WITHOUT calling saveEx().
+	 * Reads PriceActual from DB to bypass any in-memory contamination.
+	 * Caller is responsible for calling saveEx() after this method.
+	 */
+	public static void prepareUomAndQuantity(MOrderLine orderLine, int unitOfMeasureId, BigDecimal quantity) {
+		// Read price from DB to bypass any in-memory contamination before this call.
+		BigDecimal savedPriceActual = DB.getSQLValueBD(
+				orderLine.get_TrxName(),
+				"SELECT PriceActual FROM C_OrderLine WHERE C_OrderLine_ID=?",
+				orderLine.getC_OrderLine_ID());
+		if(savedPriceActual == null || savedPriceActual.signum() == 0) {
+			savedPriceActual = orderLine.getPriceActual();
+		}
 		if(quantity != null) {
 			orderLine.setQty(quantity);
 		}
+		int currentUomId = orderLine.getC_UOM_ID();
+		boolean uomChanging = unitOfMeasureId > 0 && unitOfMeasureId != currentUomId;
 		if(unitOfMeasureId > 0) {
 			orderLine.setC_UOM_ID(unitOfMeasureId);
 		}
-		BigDecimal quantityEntered = orderLine.getQtyEntered();
-		BigDecimal priceEntered = orderLine.getPriceEntered();
-		BigDecimal convertedQuantity = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), orderLine.getC_UOM_ID(), quantityEntered);
-		BigDecimal convertedPrice = MUOMConversion.convertProductTo(orderLine.getCtx(), orderLine.getM_Product_ID(), orderLine.getC_UOM_ID(), priceEntered);
-		orderLine.setQtyOrdered(convertedQuantity);
-		orderLine.setPriceActual(convertedPrice);
+		int targetUomId = orderLine.getC_UOM_ID();
+		if(uomChanging) {
+			BigDecimal quantityEntered = orderLine.getQtyEntered();
+			BigDecimal convertedQuantity = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, quantityEntered);
+			orderLine.setQtyOrdered(convertedQuantity != null ? convertedQuantity : quantityEntered);
+			BigDecimal currentFactor = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), currentUomId, BigDecimal.ONE);
+			if(currentFactor != null && currentFactor.signum() > 0 && currentFactor.compareTo(BigDecimal.ONE) != 0) {
+				savedPriceActual = savedPriceActual.divide(currentFactor, 10, java.math.RoundingMode.HALF_UP);
+			}
+			BigDecimal convertedPrice = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, savedPriceActual);
+			if(convertedPrice == null) {
+				convertedPrice = savedPriceActual;
+			}
+			orderLine.setPriceList(convertedPrice);
+			orderLine.setPriceEntered(convertedPrice);
+			orderLine.setPriceActual(convertedPrice);
+		}
+		orderLine.setLineNetAmt();
+		// Caller is responsible for calling saveEx()
+	}
+	public static void updateUomAndQuantity(MOrderLine orderLine, int unitOfMeasureId, BigDecimal quantity) {
+		BigDecimal savedPriceActual = (BigDecimal) orderLine.get_ValueOld("PriceActual");
+		if(savedPriceActual == null || savedPriceActual.signum() == 0) {
+			savedPriceActual = orderLine.getPriceActual();
+		}
+		if(quantity != null) {
+			orderLine.setQty(quantity);
+		}
+		int currentUomId = orderLine.getC_UOM_ID();
+		boolean uomChanging = unitOfMeasureId > 0 && unitOfMeasureId != currentUomId;
+		if(unitOfMeasureId > 0) {
+			orderLine.setC_UOM_ID(unitOfMeasureId);
+		}
+		int targetUomId = orderLine.getC_UOM_ID();
+		if(uomChanging) {
+			BigDecimal quantityEntered = orderLine.getQtyEntered();
+			BigDecimal convertedQuantity = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, quantityEntered);
+			orderLine.setQtyOrdered(convertedQuantity != null ? convertedQuantity : quantityEntered);
+			BigDecimal currentFactor = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), currentUomId, BigDecimal.ONE);
+			if(currentFactor != null && currentFactor.signum() > 0 && currentFactor.compareTo(BigDecimal.ONE) != 0) {
+				savedPriceActual = savedPriceActual.divide(currentFactor, 10, java.math.RoundingMode.HALF_UP);
+			}
+			BigDecimal convertedPrice = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, savedPriceActual);
+			if(convertedPrice == null) {
+				convertedPrice = savedPriceActual;
+			}
+			orderLine.setPriceList(convertedPrice);
+			orderLine.setPriceEntered(convertedPrice);
+			orderLine.setPriceActual(convertedPrice);
+		}
 		orderLine.setLineNetAmt();
 		orderLine.saveEx();
 	}
