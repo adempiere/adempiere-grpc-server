@@ -126,13 +126,14 @@ public class OrderUtil {
 	 * Caller is responsible for calling saveEx() after this method.
 	 */
 	public static void prepareUomAndQuantity(MOrderLine orderLine, int unitOfMeasureId, BigDecimal quantity) {
-		// Read price from DB to bypass any in-memory contamination before this call.
+		// Read PriceList (not PriceActual) to convert from the clean list price,
+		// ignoring any discount the user had set before the UOM change.
 		BigDecimal savedPriceActual = DB.getSQLValueBD(
 				orderLine.get_TrxName(),
-				"SELECT PriceActual FROM C_OrderLine WHERE C_OrderLine_ID=?",
+				"SELECT PriceList FROM C_OrderLine WHERE C_OrderLine_ID=?",
 				orderLine.getC_OrderLine_ID());
 		if(savedPriceActual == null || savedPriceActual.signum() == 0) {
-			savedPriceActual = orderLine.getPriceActual();
+			savedPriceActual = orderLine.getPriceList();
 		}
 		if(quantity != null) {
 			orderLine.setQty(quantity);
@@ -158,6 +159,7 @@ public class OrderUtil {
 			orderLine.setPriceList(convertedPrice);
 			orderLine.setPriceEntered(convertedPrice);
 			orderLine.setPriceActual(convertedPrice);
+			orderLine.setDiscount(Env.ZERO);
 		}
 		orderLine.setLineNetAmt();
 		// Caller is responsible for calling saveEx()
