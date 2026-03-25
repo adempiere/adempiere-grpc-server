@@ -4961,6 +4961,8 @@ public class PointOfSalesForm extends StoreImplBase {
 				}
 				orderLine.setQty(quantityToOrder);
 				orderLine.setPrice();
+				orderLine.setPriceList(orderLine.getPriceActual());  // PriceList = selling price → 0% gap
+				orderLine.setDiscount(Env.ZERO);                     // clear stale discount from setPrice()
 				orderLine.setTax();
 				//	Save Line
 				orderLine.saveEx(transactionName);
