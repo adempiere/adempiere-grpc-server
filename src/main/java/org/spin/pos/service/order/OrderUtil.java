@@ -35,6 +35,8 @@ import org.compiere.model.MPOS;
 import org.compiere.model.MPayment;
 import org.compiere.model.MUOMConversion;
 import org.compiere.model.MPriceList;
+import org.compiere.model.MProduct;
+import org.compiere.model.MProductPricing;
 import org.compiere.model.MTable;
 import org.compiere.model.PO;
 import org.compiere.model.Query;
@@ -148,13 +150,35 @@ public class OrderUtil {
 			BigDecimal quantityEntered = orderLine.getQtyEntered();
 			BigDecimal convertedQuantity = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, quantityEntered);
 			orderLine.setQtyOrdered(convertedQuantity != null ? convertedQuantity : quantityEntered);
-			BigDecimal currentFactor = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), currentUomId, BigDecimal.ONE);
-			if(currentFactor != null && currentFactor.signum() > 0 && currentFactor.compareTo(BigDecimal.ONE) != 0) {
-				savedPriceActual = savedPriceActual.divide(currentFactor, 10, java.math.RoundingMode.HALF_UP);
-			}
-			BigDecimal convertedPrice = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, savedPriceActual);
-			if(convertedPrice == null) {
-				convertedPrice = savedPriceActual;
+			// Use same methodology as CalloutOrder
+			// to avoid precision loss from reversing intermediate rounded UOM prices.
+			MOrder order = (MOrder) orderLine.getC_Order();
+			MProductPricing productPricing = new MProductPricing(
+				orderLine.getM_Product_ID(),
+				order.getC_BPartner_ID(),
+				orderLine.getQtyOrdered(),
+				order.isSOTrx(),
+				null);
+			productPricing.setM_PriceList_ID(order.getM_PriceList_ID());
+			productPricing.setPriceDate(order.getDateOrdered());
+			BigDecimal baseStdPrice = productPricing.getPriceStd();
+			BigDecimal convertedPrice;
+			if(baseStdPrice != null && baseStdPrice.signum() > 0) {
+				int productUomId = MProduct.get(orderLine.getCtx(), orderLine.getM_Product_ID()).getC_UOM_ID();
+				if(targetUomId == productUomId) {
+					convertedPrice = baseStdPrice;
+				} else {
+					convertedPrice = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, baseStdPrice);
+					if(convertedPrice == null) convertedPrice = baseStdPrice;
+				}
+			} else {
+				// Fallback: factor-based conversion
+				BigDecimal currentFactor = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), currentUomId, BigDecimal.ONE);
+				if(currentFactor != null && currentFactor.signum() > 0 && currentFactor.compareTo(BigDecimal.ONE) != 0) {
+					savedPriceActual = savedPriceActual.divide(currentFactor, 10, java.math.RoundingMode.HALF_UP);
+				}
+				convertedPrice = MUOMConversion.convertProductFrom(orderLine.getCtx(), orderLine.getM_Product_ID(), targetUomId, savedPriceActual);
+				if(convertedPrice == null) convertedPrice = savedPriceActual;
 			}
 			orderLine.setPriceList(convertedPrice);
 			orderLine.setPriceEntered(convertedPrice);
