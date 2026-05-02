@@ -9,6 +9,16 @@
 > **under construction**. Interfaces and configuration may change without notice.
 > Production use is not yet recommended.
 
+> [!NOTE]
+> **Docker image location caveat:** Due to a GitHub Container Registry limitation, the Docker image
+> `ghcr.io/adempiere/adempiere-grpc-server` is attributed to [`adempiere/backend`](https://github.com/adempiere/backend)
+> in the GitHub UI — the repository that originally published to this package name.
+> The image is fully functional and can be pulled normally:
+> ```
+> docker pull ghcr.io/adempiere/adempiere-grpc-server:1.0.0
+> ```
+> Browse all available versions at: https://github.com/adempiere/backend/pkgs/container/adempiere-grpc-server
+
 <p align="center">
   <a href="https://adoptium.net/es/temurin/releases/?version=11">
     <img src="https://badgen.net/badge/Java/11/orange" alt="Java">
