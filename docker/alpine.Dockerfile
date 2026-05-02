@@ -1,7 +1,8 @@
 FROM eclipse-temurin:17.0.16_8-jdk-alpine-3.22
 
 LABEL maintainer="ySenih@erpya.com; EdwinBetanc0urt@outlook.com;" \
-	description="ADempiere gRPC All In One Server used as ADempiere adempiere-grpc-server"
+	description="ADempiere gRPC backend server — exposes ADempiere business logic as gRPC services" \
+	org.opencontainers.image.source=https://github.com/adempiere/adempiere-grpc-server
 
 # Init ENV with default values
 ENV \
